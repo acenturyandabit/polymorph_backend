@@ -85,7 +85,9 @@ wshtserver.listen(14403, function () { });
 
 // create the server
 wsServer = new WebSocketServer({
-    httpServer: wshtserver
+    httpServer: wshtserver,
+    maxReceivedFrameSize:10000000,
+    maxReceivedMessageSize:10000000
 });
 
 let gitdir = ""
@@ -97,6 +99,7 @@ wsServer.on('request', function (request) {
     let data;
     let localCopy;
     let lus;
+    let timekeys;
     connection.on('message', function (message) {
         let response = JSON.parse(message.utf8Data);
         console.log(message.utf8Data);
@@ -104,10 +107,10 @@ wsServer.on('request', function (request) {
             case "push":
                 // try and find an entry with msg.id
                 saveF = String(response.id).replace(/\./g, "_");
-                console.log(saveF);
                 try {
                     localCopy = JSON.parse(String(fs.readFileSync(private.baseGitLocation + "/" + saveF + ".json")));
                 } catch (e) {
+                    console.log(`save file ${private.baseGitLocation + "/" + saveF + ".json"} nonexistent`);
                     //save file does not exist, create one
                     connection.send(JSON.stringify({
                         op: "accept",
@@ -117,7 +120,8 @@ wsServer.on('request', function (request) {
                 }
                 let wasSent = false;
                 for (let i = 0; i < response._lu_.length; i++) {
-                    if (localCopy[response._lu_[i].id]._lu_ == response._lu_[i]._lu_) {
+                    if (localCopy[response._lu_[i].id] && localCopy[response._lu_[i].id]._lu_ == response._lu_[i]._lu_) {
+                        console.log(`localcopy ${response._lu_[i].id} aligned`);
                         // accept this
                         connection.send(JSON.stringify({
                             op: "accept",
@@ -132,7 +136,7 @@ wsServer.on('request', function (request) {
                     //oh well
                     ws.send(JSON.stringify({
                         op: "accept",
-                        _lu_: response._lu_[response._lu_.length]._lu_
+                        _lu_: response._lu_[response._lu_.length - 1]._lu_
                     }));
                 }
                 break;
@@ -140,13 +144,13 @@ wsServer.on('request', function (request) {
                 saveF = String(response.id).replace(/\./g, "_");
                 try {
                     data = JSON.parse(String(fs.readFileSync(private.baseGitLocation + "/" + saveF + ".json")));
-                    lus = Object.entries(data).map((i) => ({ _lu_: i[1]._lu_, id: i[0] }));
+                    timekeys = Object.entries(data).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
                     let pow2 = 0;
-                    lus = lus.sort((a, b) => a._lu_ - b._lu_).filter((i, ii) => {
-                        if (!(ii % (2 ** pow2)) || ii == lus.length - 1) {
+                    lus = timekeys.filter((i, ii) => {
+                        if (!(ii % (2 ** pow2)) || ii == timekeys.length - 1) {
                             pow2++;
                             return true;
-                        }
+                        } else return false;
                     });
                     connection.send(JSON.stringify({
                         id: response.id,
@@ -165,7 +169,7 @@ wsServer.on('request', function (request) {
                 break;
             case "accept":
                 // send over the data
-                let dataToSend = lus.filter(i => i._lu_ >= response._lu_).map(i => ({ id: i.id, data: data[i.id] }));
+                let dataToSend = timekeys.filter(i => i._lu_ >= response._lu_).map(i => ({ id: i.id, data: data[i.id] }));
                 connection.send(JSON.stringify({
                     op: "transfer",
                     data: dataToSend
@@ -177,10 +181,12 @@ wsServer.on('request', function (request) {
                     localCopy = {};
                 }
                 console.log(saveF);
+                console.log("got a transfer msg");
                 for (let i of response.data) {
                     if (!localCopy[i.id] || localCopy[i.id]._lu_ < i.data._lu_) localCopy[i.id] = i.data;
                 }
                 fs.writeFileSync(private.baseGitLocation + "/" + saveF + ".json", JSON.stringify(localCopy));
+                connection.send(JSON.stringify({ op: "thanks" }));
                 break;
             case "reject":
                 connection.close();
@@ -219,6 +225,9 @@ wsServer.on('request', function (request) {
         }*/
     });
     connection.on("close", () => {
+        console.log("big sad");
+        console.log(connection.closeReasonCode);
+        console.log(connection.closeDescription);
         //cons.splice(cons.indexOf(connection), 1);
     });
 });
