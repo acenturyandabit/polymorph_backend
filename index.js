@@ -134,7 +134,7 @@ wsServer.on('request', function (request) {
                 if (!wasSent) {
                     // something is probably wrong because thats a lot of unsents
                     //oh well
-                    ws.send(JSON.stringify({
+                    connection.send(JSON.stringify({
                         op: "accept",
                         _lu_: response._lu_[response._lu_.length - 1]._lu_
                     }));
