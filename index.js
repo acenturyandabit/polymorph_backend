@@ -23,5 +23,7 @@ saveloader.prepare(app, private);
 var gitlite = require("./gitlite");
 gitlite.prepare(app, private);
 
-var lobby = require("./lobby");
-gitlite.prepare(app, private);
+if (private.lobbyFileLocation) { // dont want this on the linode
+    var lobby = require("./lobby");
+    lobby.prepare(app, private);
+}
