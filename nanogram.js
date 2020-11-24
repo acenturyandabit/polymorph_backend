@@ -1,32 +1,70 @@
-//client start
-/*THE HASH
-Must tell if versions are different
+/*
+Nanogram js
 
-EACH datapoint
-must have last modified + data
-must be ordered
+Functions:
+new nanogram({
+    udpPort
+    transmitPort
+    callWord
+}): returns:{
+    on(): for adding listeners to events. only one supported right now is newPeer.
+    connectTo(ID): pass a peer ID and it'll connect to the peer; messages still routed through addEventListener
+    getPeers(): returns list of peers as array of string
+    id: self's ID. if not specified, generates own uniqueish ID using some property unique to the computer (RNG(100) * 1e14 + date.time())
+}
 
-IN CASE OF CONFLICT
-take most recent one, always
+
+
+usage
+
+let nng = new nanogram();
+
+let prpeareClient=(client)=>{
+    client.connection.addEventListener("data",()=>{
+        switch (client.state){
+            //do stuff
+        }
+    })
+    if (client.state=="begin"){
+        client.connection.write("hello world!"); // introduce yourself!
+        client.state="wait";
+        setTimeout(()=>{
+            client.write("I'm doing something regular");
+            client.state="waitingregular"
+        }, 1000)
+    }
+}
+
+nng.on("newPeer",(id)=>{
+    if (we want to connect){
+        client=await nng.connectTo(id);
+        prepareClient(client);
+    }
+})
+
 */
+
 
 const dgram = require('dgram');
 const net = require('net');
-
+const os = require('os');
 module.exports = function nanogram(id, _options) {
-    const server = dgram.createSocket('udp4');
+    //resolve id and options
+    if (!id) {
+        //try and get the mac address
+        id = Math.floor(Math.random() * 100) * 1e14 + Date.now();
+    }
     let options = {
         udpPort: 11233,
         transmitPort: -1,
+        callWord: "nanogram",
+        waitPeriod: 1000,
+        transmitPeriod: -1
     }
     Object.assign(options, _options);
     if (options.transmitPort < 0) options.transmitPort = options.udpPort + Date.now() % (65534 - options.udpPort);
-    //create a tcp port
+    if (options.transmitPeriod < 0) options.transmitPeriod = options.waitPeriod * 2 / 3;
 
-    let message;
-    let mydata;
-    let previousBroadcastTimer = undefined;
-    let lastUpdateTime;
     //add an event api
     this.events = {};
     this.fire = (e, args) => {
@@ -54,232 +92,173 @@ module.exports = function nanogram(id, _options) {
         })
     };
 
-    function elstrToObj(elstr) {
-        let p = elstr.split("|");
-        console.log(p);
-        let o = {};
-        for (let i = 0; i < p.length; i++) {
-            if (p[i]) {
-                let ab = p[i].split("!");
-                o[ab[0]] = ab[1];
-                console.log(ab);
-            }
-        }
-        return o;
-    }
-
-    function encodeString(str) {
-        let charbox = [];
-        let place = 0;
-
-        for (let i = 0; i < str.length; i++) {
-            if (charbox.length < place + 1) charbox.push(0);
-            charbox[place] += str.charCodeAt(i);
-            charbox[place] %= 49;
-            place++;
-            place %= 64;
-        }
-        charbox = charbox.map((i) => String.fromCharCode(i + 48));
-        return charbox.join("");
-    }
-
-    function encodeSub(data) {
-        let output = "";
-        for (let i in data) {
-            output += i + "!" + encodeList(data[i]) + "|";
-        }
-        return output;
-    }
-
-    function encodeList(data) {
-        //hash the list.
-        let asString = JSON.stringify(data);
-        return encodeString(asString);
-    }
-
-
-    let tcpserv = net.createServer((s) => {
-        console.log(`ATTEMPT PUSH TO ${s.address().address}`);
-        //stop calling out
-        clearInterval(previousBroadcastTimer);
-        // someone wants to pull from me!
-        //First check that our IDs are the same and our versions are the same.
-        //Recieve their liststring; check our liststring
-        let stage = 0;
-        let keys;
-        let inindex = 0;
-        s.on("data", (data) => {
-            console.log(`push recieved ${data}`);
-            let strdata = data.toString();
-            switch (stage) {
-                case 0:
-                    //send my liststring
-                    s.write(encodeSub(mydata));
-                    console.log(encodeSub(mydata));
-                    stage++;
-                    inindex=0;
-                    break;
-                case 1:
-                    //get the items they want
-                    if (strdata != "!!") {
-                        keys = strdata.split("|");
-                    }
-                    console.log(keys);
-                    if (inindex < keys.length) {
-                        if (keys[inindex]) {
-                            s.write(keys[inindex] + ":" + JSON.stringify(mydata[keys[inindex]]));
-                        }
-                        inindex++;
-                    } else {
-                        s.end();
-                    }
-                    break;
-            }
-        })
-    })
-
-    tcpserv.listen(options.transmitPort);
-    //get their liststring
-
-    let pull = (port, addr) => {
-        let socket = net.createConnection({ host: addr, port: port }, () => {
-            clearInterval(previousBroadcastTimer);
-            console.log(`ATTEMPT PULL FROM ${addr}`);
-
-            let stage = 0;
-            socket.on("data", (data) => {
-                console.log(`pull recieved ${data}`);
-                let strdata = data.toString();
-                switch (stage) {
-                    case 0:
-                        let els = elstrToObj(strdata);
-                        let toPull = [];
-                        let myels = elstrToObj(encodeSub(mydata));
-                        if (mydata) {
-                            for (let i in els) {
-                                if (els[i] != myels[i]) {
-                                    //request to pull
-                                    toPull.push(i);
-                                }
-                            }
-                        }
-                        if (!toPull.length) {
-                            socket.end();
-                        } else {
-                            console.log(`sent${toPull.join("|")}`);
-                            socket.write(toPull.join("|"));
-                        }
-                        stage++;
-                        break;
-                    case 1:
-                        //lots of messages coming throught
-                        let p = strdata.indexOf(":");
-                        mydata[strdata.slice(0, p)] = JSON.parse(strdata.slice(p + 1));
-                        socket.write("!!");
-                        break;
-                }
-            });
-            socket.on("close", () => {
-                this.fire("change", mydata);
-            });
-            socket.write("ready");
-        });
-    }
-
-    let nanogramReady = false;
+    //create a udp port
+    const server = dgram.createSocket('udp4');
     server.bind(options.udpPort, undefined, () => {
         server.setBroadcast(true);
-        nanogramReady = true;
     })
 
     server.on('error', (err) => {
         console.log(`server error:\n${err.stack}`);
         server.close();
     });
-
+    let knownPeers = {};
     server.on('message', (msg, rinfo) => {
-        console.log(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
+        //if in correct format, add to the list
+        //console.log(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
         msg = msg.toString();
-        if (message) {
-            let msplit = msg.split("|");
-            let messsplit = message.split("|");
-            if (msplit[0] != messsplit[0] && msplit[1] == messsplit[1] && Number(messsplit[3]) < Number(msplit[3])) {
-                //fire me at their tcp to pull
-                pull(Number(msplit[2]), rinfo.address);
+        try {
+            let message = JSON.parse(msg);
+            if (message.callWord == options.callWord) {
+                //add it to the list of known clients
+                let newPeer = false;
+                if (message.id == id) return;
+                if (!knownPeers[message.id]) {
+                    newPeer = true;
+                    knownPeers[message.id] = {};
+                }
+                Object.assign(knownPeers[message.id], {
+                    addr: rinfo.address,
+                    port: message.port,
+                    id: message.id,
+                    lastSeen: Date.now()
+                })
+                for (let i of message.conreqs) {
+                    if (i == id) {
+                        if (knownPeers[message.id].conreq) {
+                            if (knownPeers[message.id].conreq != true) {
+                                let socket = net.createConnection({ host: knownPeers[message.id].addr, port: knownPeers[message.id].port }, () => {
+                                    socket.write(`nanogram_${id}`, () => {
+                                        setTimeout(() => {
+                                            knownPeers[message.id].conreq({
+                                                connection: socket,
+                                                id: message.id,
+                                                state: "begin"
+                                            }); // otherwise first message is merged w nanogram id.
+                                        }, 100);
+                                    });
+                                });
+                            }
+                        } else {
+                            knownPeers[message.id].conreq = true;
+                        }
+                    }
+                }
+                if (newPeer) {
+                    this.fire("newPeer", message.id);
+                }
             }
+        } catch (e) {
+            console.log(e);
+            return;
         }
     });
 
     server.on('listening', () => {
         const address = server.address();
-        console.log(`server listening ${address.address}:${address.port}`);
+        console.log(`server listening ${address.address}:${address.port}; self id is ${id}`);
     });
 
-    this.on('newData,change', function ready(data) {
-        mydata = data;
-        lastUpdateTime = Date.now();
-        if (nanogramReady) {
-            //start broadcasting
-            if (previousBroadcastTimer != undefined) {
-                clearInterval(previousBroadcastTimer);
+    let conreqs = {};
+
+    //figure out which address(es) to broadcast on
+    let baddrs = [];
+    let infs = os.networkInterfaces();
+    for (let inf in infs) {
+        for (let addrblock of infs[inf]) {
+            if (addrblock.family == "IPv4" && addrblock.mac != "00:00:00:00:00:00") {
+                console.log(addrblock);
+                let nmn = addrblock.netmask.split(".").map(i => Number(i));
+                let na = addrblock.address.split(".").map(i => Number(i));
+                baddrs.push(na.map((v, i) => v | (255 ^ nmn[i])).join("."));
             }
-            message = `${encodeList(data)}|${id}|${options.transmitPort}|${lastUpdateTime}`;
-            previousBroadcastTimer = setInterval(() => {
-                server.send(message, 0, message.length, options.udpPort, "255.255.255.255");
-                console.log(`sent ${message}`);
-            }, 1000);
-        } else {
-            setTimeout(() => { ready(data), 1000 });
         }
+    }
+    console.log(baddrs);
+
+    setInterval(() => {
+        let message = JSON.stringify({
+            port: options.transmitPort,
+            id: id,
+            callWord: options.callWord,
+            conreqs: Object.keys(conreqs)
+        })
+        for (let i of baddrs) {
+            server.send(message, 0, message.length, options.udpPort, i);
+        }
+    }, options.transmitPeriod)
+
+    //create a tcp listener
+    let tcpserv = net.createServer((s) => {
+        s.once("data", (data) => {
+            data = data.toString();
+            console.log(data);
+            let nanotag = /nanogram_(\d+)/.exec(data);
+            if (nanotag) {
+                if (conreqs[nanotag[1]]) {
+                    conreqs[nanotag[1]]({
+                        connection: s,
+                        id: nanotag[1],
+                        state: "wait"
+                    });
+                    delete conreqs[nanotag[1]];
+                } else {
+                    s.end();
+                }
+            } else {
+                s.end();
+            }
+        });
     })
 
-    //now for TCP connections
-    //create new tcp listener
-    //when tcp listener receives data, merge it.
+    tcpserv.listen(options.transmitPort, "0.0.0.0");
 
-
+    this.connectTo = async(targetID) => {
+        return new Promise((res) => {
+            if (targetID < id) {
+                // we need to create con
+                if (knownPeers[targetID].conreq == true) {
+                    let socket = net.createConnection({ host: knownPeers[targetID].addr, port: knownPeers[targetID].port }, () => {
+                        socket.write(`nanogram_${id}`, () => {
+                            setTimeout(() => {
+                                res({
+                                    connection: socket,
+                                    id: targetID,
+                                    state: "begin"
+                                }); // otherwise first message is merged w nanogram id.
+                            }, 100);
+                        });
+                    });
+                } else { // will overwrite previous conreqs. TODO: make array? 
+                    knownPeers[targetID].conreq = res;
+                }
+            } else {
+                // tell self to broadcast conreq intent
+                conreqs[targetID] = res;
+            }
+        })
+    }
 
 }
 
-
-
-
-///////////////usage
 /*
-nanogram.on('update',(newdata)=>{
-    //the new data, for you to do as you will.
-})
 
-nanogram.fire('newData',data);
-//push data to nanogram.
+1.connect()
+1 broadcasts conreq to 2, since lower id
+2 recieves conreq, sets flag
+2.connect(), sees flag
+2 conns to 1
 
-let data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
-//data MUST be a javascript object. if you just need an array, make it like {0: item0, 1: item1} etc.
-// for consistency's sake.
+1.connect()
+1 broadcasts conreq to 2, since lower id
+2.connect(), sees no flag
+2 recieves conreq, sees flag
+2 conns to 1
+
+2.connect(), sees no flag, sets flag
+1.connect()
+1 broadcasts conreq to 2, since lower id
+2 recieves conreq, sees flag
+2 conns to 1
 
 */
-
-
-
-
-
-
-// Prints: server listening 0.0.0.0:41234
-
-
-
-//occasionally, broadcast on UDP to others
-//document name, revision hash, port i can listen on
-
-// listen for udp broadcasts
-// if hear one, compare to current hash. 
-
-//if different, say hi by trying to establish TCP connection
-
-//listen for connections. When connection made, temporarily pause broadcast
-
-//send over all hashes
-
-//compare hashes, tell which ones are different
-
-//For different ones, which is earlier?
