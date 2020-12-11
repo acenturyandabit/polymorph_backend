@@ -13,9 +13,13 @@ app.listen(8080);
 
 app.use(cors());
 
-var app2 = express();
-app2.get("*", (req, res) => res.send(`<script>window.location.href="http://localhost:8080"</script>`));
-app2.listen(80);
+/*try {
+    var app2 = express();
+    app2.get("*", (req, res) => res.send(`<script>window.location.href="http://localhost:8080"</script>`));
+    app2.listen(80);
+} catch (e) {
+
+}*/
 
 var saveloader = require("./saveload");
 saveloader.prepare(app, private);

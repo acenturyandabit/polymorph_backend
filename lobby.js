@@ -79,12 +79,27 @@ function RTmanager() {
     }
 
     this.attach = (source) => {
+        console.log("attaching source of type " + source.__proto__.constructor.name);
         this.sources.push(source);
         source.on("message", (data) => {
             data = JSON.parse(data.utf8Data);
             let broadcastItems = [];
             let requestItems = [];
             switch (data.type) {
+                case "mergeCheck":
+                    for (let i = 0; i < data.items.length; i++) {
+                        if (this.localCopy[data.items[i].id] && data.items[i]._lu_ == this.localCopy[data.items[i].id]._lu_) {
+                            //send over the items from this point
+                            let toSend = Object.entries(this.localCopy);
+                            toSend = toSend.filter(it => it[1]._lu_ >= data.items[i]._lu_);
+                            source.send(JSON.stringify({
+                                type: "transmit",
+                                data: toSend
+                            }))
+                            break;
+                        }
+                    }
+                    break;
                 case "request":
                     // send over my copy of stuff
                     source.send(JSON.stringify({
@@ -94,10 +109,10 @@ function RTmanager() {
                     break;
                 case "transmit":
                     for (let i of data.data) {
-                        if (!this.localCopy[i[0]] || this.localCopy.items[i[0]]._lu_ < i[1]._lu_) {
-                            this.localCopy.items[i[0]] = i[1];
+                        if (!this.localCopy[i[0]] || this.localCopy[i[0]]._lu_ < i[1]._lu_) {
+                            this.localCopy[i[0]] = i[1];
                             broadcastItems.push(i);
-                            console.log("broadcasting changes at " + i[0]);
+                            //console.log("broadcasting changes at " + i[0]);
                         }
                     }
                     if (broadcastItems.length) {
@@ -112,11 +127,12 @@ function RTmanager() {
                     for (let i of data.data) {
                         if (!this.localCopy[i[0]] || i[1] > this.localCopy[i[0]]._lu_) {
                             if (i[2]) {
+                                this.localCopy[i[0]] = i[2];
                                 broadcastItems.push([i[0], i[2]]);
-                                console.log("broadcasting changes at " + i[0]);
+                                //console.log("broadcasting changes at " + i[0]);
                             } else {
                                 requestItems.push(i[0]);
-                                console.log("requesting changes at " + i[0]);
+                                //console.log("requesting changes at " + i[0]);
                             }
                         }
                     }
@@ -133,8 +149,23 @@ function RTmanager() {
                             data: requestItems
                         }));
                     }
+                    break;
             }
-        })
+        });
+        this.sendMergeRequest = (source) => {
+            let timekeys = Object.entries(this.localCopy).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
+            let pow2 = 0;
+            let lus = timekeys.filter((i, ii) => {
+                if (!(ii % (2 ** pow2)) || ii == timekeys.length - 1) {
+                    pow2++;
+                    return true;
+                } else return false;
+            });
+            source.send(JSON.stringify({
+                type: "mergeCheck",
+                items: lus
+            }))
+        }
     }
 }
 
@@ -146,6 +177,7 @@ function TCPsource(tcpconn, id) {
         data.op = "RTmsg";
         data = JSON.stringify(data);
         tcpconn.write(data + "\n");
+        console.log("i reckon i sent a message");
     }
 }
 
@@ -164,7 +196,7 @@ module.exports = {
                     } else {
                         latestTime = 0;
                         files.forEach(i => {
-                            console.log(i);
+                            //console.log(i);
                             let lastTimeRe = /.+?(\d+)\.json/.exec(i);
                             if (lastTimeRe) {
                                 let lastTime = Number(lastTimeRe[1]);
@@ -175,12 +207,20 @@ module.exports = {
                         });
                         if (latestTime != 0) {
                             fs.readFile(path.join(private.lobbyFileLocation + "/" + saveF, saveF + "_" + latestTime + ".json"), (err, data) => {
+                                if (!data) return; // somehow files get deleted after they're made? how?
+                                data = data.toString();
                                 if (err) {
                                     res(undefined);
                                     console.log(err);
                                 } else {
                                     if (decompress) {
-                                        res(polymorph_core.datautils.decompress(JSON.parse(data)));
+                                        try {
+                                            res(polymorph_core.datautils.decompress(JSON.parse(data)));
+                                        } catch (e) {
+                                            console.log(e);
+                                            console.log(data);
+                                            res(undefined);
+                                        }
                                     } else {
                                         res(JSON.parse(data));
                                     }
@@ -225,8 +265,9 @@ module.exports = {
                                     time: lastTimeRe
                                 }
                             });
-                            toDelete.sort((a, b) => { b.time - a.time });
+                            toDelete.sort((a, b) => b.time - a.time);
                             toDelete = toDelete.filter((v, i) => i > 10).map(i => i.name);
+                            console.log(toDelete);
                             toDelete.forEach(i => fs.unlink(private.lobbyFileLocation + "/" + saveF + "/" + i, () => {}));
                         }
                     });
@@ -258,6 +299,13 @@ module.exports = {
             res.sendStatus(200);
             res.end();
             //also force merge
+            if (!availList[req.query.f]) {
+                availList[req.query.f] = {
+                    id: req.query.f,
+                    type: "local"
+                }
+            }
+            // if the document comes from someone else, patch it
             if (availList[req.query.f].externHosts) {
                 availList[req.query.f].externHosts = availList[req.query.f].externHosts.filter(h => {
                     if (onlineClients[h]) {
@@ -282,6 +330,13 @@ module.exports = {
                         return false;
                     }
                 })
+            }
+            // tell all our friends that we have a new document
+            for (let cl in onlineClients) {
+                onlineClients[cl].connection.write(JSON.stringify({
+                    op: "pushAvailListC",
+                    list: [req.query.f]
+                }) + "\n")
             }
         });
 
@@ -329,167 +384,203 @@ module.exports = {
             if (client.state == "begin") {
                 client.connection.write(JSON.stringify({
                     op: "pushAvailListA",
-                    list: Object.values(availList).filter(i => i.type == "local")
+                    list: Object.values(availList).filter(i => i.type == "local"),
+                    RTList: Object.keys(RTmanagers)
                 }) + "\n");
             }
             onlineClients[client.id] = client;
             let prevChunk = "";
             client.TCPsources = {};
             client.connection.on("data", async(data) => {
-                console.log(data.toString());
                 data = prevChunk + data.toString();
                 if (!data.endsWith("\n")) {
                     prevChunk = data;
                     return;
                 }
                 prevChunk = "";
-                data = JSON.parse(data.toString());
-                console.log(data);
-                let composedMessage;
-                switch (data.op) {
-                    //do stuff
-                    case "pushAvailListA":
-                        client.connection.write(JSON.stringify({
-                            op: "pushAvailListB",
-                            list: Object.values(availList).filter(i => i.type == "local")
-                        }) + "\n");
-                        //fall through
-                    case "pushAvailListB":
-                        composedMessage = {
-                            op: "mergeStart",
-                            files: []
-                        };
-                        let remoteList = data.list;
-                        remoteList = remoteList.map(i => {
-                            i.type = "remote";
-                            i.hostID = client.id;
-                            return i;
-                        });
-                        let commons = [];
-                        for (let i of remoteList) {
-                            if (availList[i.id]) {
-                                if (availList[i.id].type == "local") {
-                                    commons.push(i.id);
-                                }
-                            } else {
-                                availList[i.id] = i;
+                datae = data.split("\n");
+                for (data of datae) {
+                    if (!data.length) continue; // trailing ''s
+                    try {
+                        data = JSON.parse(data.toString());
+                    } catch (e) {
+                        console.log(e);
+                        console.log(data);
+                    }
+                    console.log(data.op, client.id);
+                    let composedMessage;
+                    switch (data.op) {
+                        //do stuff
+                        case "pushAvailListA":
+                            client.connection.write(JSON.stringify({
+                                op: "pushAvailListB",
+                                list: Object.values(availList).filter(i => i.type == "local"),
+                                RTList: Object.keys(RTmanagers)
+                            }) + "\n");
+                            //fall through
+                        case "pushAvailListB":
+                        case "pushAvailListC":
+                            composedMessage = {
+                                op: "mergeStart",
+                                files: []
+                            };
+                            let remoteList = data.list;
+                            remoteList = remoteList.map(i => {
+                                i.type = "remote";
+                                i.hostID = client.id;
+                                return i;
+                            });
+                            if (data.op == "pushAvailListC") {
+                                break;
                             }
-                            if (!availList[i.id].externHosts) availList[i.id].externHosts = [];
-                            availList[i.id].externHosts.push(client.id);
-                        }
-                        if (data.op == "pushAvailListB") {
-                            for (let f of commons) {
-                                let localCopy = await loadFile(f, true);
+                            let commons = [];
+                            for (let i of remoteList) {
+                                if (availList[i.id]) {
+                                    if (availList[i.id].type == "local") {
+                                        commons.push(i.id);
+                                    }
+                                } else {
+                                    availList[i.id] = i;
+                                }
+                                if (!availList[i.id].externHosts) availList[i.id].externHosts = [];
+                                availList[i.id].externHosts.push(client.id);
+                                if (RTmanagers[i.id]) {
+                                    RTmanagers[i.id].attach(new TCPsource(client.connection, i.id));
+                                }
+                            }
+
+                            for (let i of data.RTList) {
+                                if (RTmanagers[i]) {
+                                    RTmanagers[i].attach(new TCPsource(client.connection, i));
+                                }
+                            }
+
+                            if (data.op == "pushAvailListB") {
+                                for (let f of commons) {
+                                    let localCopy = await loadFile(f, true);
+                                    let timekeys = Object.entries(localCopy).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
+                                    let pow2 = 0;
+                                    let lus = timekeys.filter((i, ii) => {
+                                        if (!(ii % (2 ** pow2)) || ii == timekeys.length - 1) {
+                                            pow2++;
+                                            return true;
+                                        } else return false;
+                                    });
+                                    composedMessage.files.push({
+                                        id: f,
+                                        changes: lus
+                                    })
+                                }
+                                client.connection.write(JSON.stringify(composedMessage) + "\n");
+                                //push over commons
+                            }
+                            break;
+                        case "mergeStart":
+                            // try and find an entry with msg.id
+                            composedMessage = {
+                                op: "mergeContinue",
+                                files: []
+                            };
+                            for (let f of data.files) {
+                                let localCopy = await loadFile(f.id, true);
+                                if (!localCopy) {
+                                    //this needs to write from scratch
+                                    console.log("yes mistake was here");
+                                }
                                 let timekeys = Object.entries(localCopy).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
-                                let pow2 = 0;
-                                let lus = timekeys.filter((i, ii) => {
-                                    if (!(ii % (2 ** pow2)) || ii == timekeys.length - 1) {
-                                        pow2++;
-                                        return true;
-                                    } else return false;
-                                });
+                                let wasSent = false;
+                                for (let i = 0; i < f.changes.length; i++) {
+                                    if (localCopy[f.changes[i].id] && localCopy[f.changes[i].id]._lu_ == f.changes[i]._lu_) {
+                                        let lastTime = localCopy[f.changes[i].id]._lu_;
+                                        timekeys = timekeys.filter(i => i._lu_ >= lastTime).map(i => ({
+                                            id: i.id,
+                                            data: localCopy[i.id]
+                                        }));
+                                        console.log("lasttime was " + lastTime + " on file " + f.id);
+                                        console.log("total changes:" + timekeys.length);
+                                        composedMessage.files.push({
+                                            id: f.id,
+                                            changes: timekeys,
+                                            commonLu: lastTime
+                                        });
+                                        wasSent = true;
+                                        break;
+                                    } else {
+                                        console.log(f.changes[i].id);
+                                    }
+                                }
+                                if (!wasSent) {
+                                    //send everything
+                                    composedMessage.files.push({
+                                        id: f.id,
+                                        changes: Object.entries(localCopy).map(i => ({
+                                            id: i[0],
+                                            data: i[1]
+                                        })),
+                                        commonLu: 0
+                                    })
+                                }
+                            }
+                            client.connection.write(JSON.stringify(composedMessage) + "\n");
+                            break;
+                        case "mergeContinue":
+                            composedMessage = {
+                                op: "mergeFinish",
+                                files: []
+                            };
+                            for (let f of data.files) {
+                                let localCopy = await loadFile(f.id, true);
+                                let timekeys = Object.entries(localCopy).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
                                 composedMessage.files.push({
-                                    id: f,
-                                    changes: lus
+                                    id: f.id,
+                                    changes: timekeys.filter(i => i._lu_ >= f.commonLu).map(i => ({
+                                        id: i.id,
+                                        data: localCopy[i.id]
+                                    }))
                                 })
                             }
                             client.connection.write(JSON.stringify(composedMessage) + "\n");
-                            //push over commons
-                        }
-                        break;
-                    case "mergeStart":
-                        // try and find an entry with msg.id
-                        composedMessage = {
-                            op: "mergeContinue",
-                            files: []
-                        };
-                        for (let f of data.files) {
-                            let localCopy = await loadFile(f.id, true);
-                            let timekeys = Object.entries(localCopy).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
-                            let wasSent = false;
-                            for (let i = 0; i < f.changes.length; i++) {
-                                if (localCopy[f.changes[i].id] && localCopy[f.changes[i].id]._lu_ == f.changes[i]._lu_) {
-                                    let lastTime = localCopy[f.changes[i].id]._lu_;
-                                    timekeys = timekeys.filter(i => i._lu_ <= lastTime).map(i => ({
-                                        id: i.id,
-                                        data: localCopy[i.id]
-                                    }));
-                                    composedMessage.files.push({
-                                        id: f.id,
-                                        changes: timekeys,
-                                        commonLu: lastTime
-                                    });
-                                    wasSent = true;
-                                    break;
+                            //fall through
+                        case "mergeFinish":
+                            //merge changes
+                            for (let f of data.files) {
+                                let localCopy = await loadFile(f.id, true);
+                                for (let c of f.changes) {
+                                    if (!localCopy[c.id] || localCopy[c.id]._lu_ < c.data._lu_) {
+                                        localCopy[c.id] = c.data;
+                                    }
                                 }
-                            }
-                            if (!wasSent) {
-                                //send everything
-                                composedMessage.files.push({
-                                    id: f.id,
-                                    changes: Object.entries(localCopy).map(i => ({
-                                        id: i[0],
-                                        data: i[1]
-                                    })),
-                                    commonLu: 0
-                                })
-                            }
-                        }
-                        client.connection.write(JSON.stringify(composedMessage) + "\n");
-                        break;
-                    case "mergeContinue":
-                        composedMessage = {
-                            op: "mergeFinish",
-                            files: []
-                        };
-                        for (let f of data.files) {
-                            let localCopy = await loadFile(f.id, true);
-                            let timekeys = Object.entries(localCopy).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
-                            composedMessage.files.push({
-                                id: f.id,
-                                changes: timekeys.filter(i => i._lu_ >= f.commonLu).map(i => ({
-                                    id: i.id,
-                                    data: localCopy[i.id]
-                                }))
-                            })
-                        }
-                        client.connection.write(JSON.stringify(composedMessage) + "\n");
-                        //fall through
-                    case "mergeFinish":
-                        //merge changes
-                        for (let f of data.files) {
-                            let localCopy = await loadFile(f.id, true);
-                            for (let c of f.changes) {
-                                if (!localCopy[c.id] || localCopy[c.id]._lu_ < c.data._lu_) {
-                                    localCopy[c.id] = c.data;
+                                saveFile(f.id, localCopy);
+                                if (availList[f.id].resolutions) {
+                                    availList[f.id].resolutions.forEach(i => i());
+                                    availList[f.id].resolutions = [];
                                 }
+                                availList[f.id].type = "local";
                             }
-                            saveFile(f.id, localCopy);
-                            if (availList[f.id].resolutions) {
-                                availList[f.id].resolutions.forEach(i => i());
-                                availList[f.id].resolutions = [];
+                            break;
+                        case "RTmsg":
+                            if (!RTmanagers[data.docID]) {
+                                RTmanagers[data.docID] = new RTmanager();
+                                RTmanagers[data.docID].encache(await loadFile(data.docID, true));
                             }
-                            availList[f.id].type = "local";
-                        }
-                        break;
-                    case "RTmsg":
-                        if (!RTmanagers[data.docID]) {
-                            RTmanagers[data.docID] = new RTmanager();
-                            RTmanagers[data.docID].encache(await loadFile(f.id, true));
-                        }
-                        if (!client.TCPsources[data.docID]) {
-                            client.TCPsources[data.docID] = new TCPsource(client.connection, data.docID);
-                            RTmanagers[data.docID].attach(client.TCPsources[data.docID]);
-                        }
-                        client.TCPsources[data.docID].fire("message", { utf8Data: JSON.stringify(data) });
+                            if (!client.TCPsources[data.docID]) {
+                                client.TCPsources[data.docID] = new TCPsource(client.connection, data.docID);
+                                RTmanagers[data.docID].attach(client.TCPsources[data.docID]);
+                            }
+                            client.TCPsources[data.docID].fire("message", { utf8Data: JSON.stringify(data) });
+                    }
                 }
             });
-            client.connection.on("error", (e) => {
+            client.connection.on("error", async(e) => {
                 //probably an errconreset
                 delete onlineClients[client.id];
+                console.log("closed " + client.id + " ," + e);
+                await nng.connectTo(client.id);
             })
-            client.connection.on("close", (e) => {
+            client.connection.on("close", async(e) => {
                 delete onlineClients[client.id];
+                console.log("closed " + client.id + " ," + e);
+                await nng.connectTo(client.id);
             })
         }
         nng.on("newPeer", async(id) => {
@@ -516,18 +607,20 @@ module.exports = {
                     if (!RTmanagers[m.data]) {
                         RTmanagers[m.data] = new RTmanager();
                         RTmanagers[m.data].encache(await loadFile(m.data, true));
-                        for (let i in availList[m.data].externHosts) {
-                            if (availList[m.data].externHosts) {
-                                availList[m.data].externHosts.forEach(i => {
-                                    if (onlineClients[i]) {
-                                        if (!onlineClients[i].TCPsources[m.data]) {
-                                            onlineClients[i].TCPsources[m.data] = new TCPsource(onlineClients[i].connection, m.data);
-                                        }
-                                        RTmanagers[m.data].attach(onlineClients[i].TCPsources[m.data]);
-                                    }
-                                })
+                    }
+                    if (availList[m.data].externHosts) {
+                        availList[m.data].externHosts.filter(i => {
+                            if (onlineClients[i]) {
+                                if (!onlineClients[i].TCPsources[m.data]) {
+                                    onlineClients[i].TCPsources[m.data] = new TCPsource(onlineClients[i].connection, m.data);
+                                }
+                                RTmanagers[m.data].attach(onlineClients[i].TCPsources[m.data]);
+                                RTmanagers[m.data].sendMergeRequest(onlineClients[i].TCPsources[m.data]);
+                                return true;
+                            } else {
+                                return false;
                             }
-                        }
+                        })
                     }
                     RTmanagers[m.data].attach(connection);
                 }

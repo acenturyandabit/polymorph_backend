@@ -27,3 +27,7 @@ nng.on("newPeer", async(id) => {
     client = await nng.connectTo(id);
     prepareClient(client);
 })
+
+nng.on("lostPeer", (id) => {
+    console.log("lost " + id);
+})

@@ -117,11 +117,21 @@ module.exports = function nanogram(id, _options) {
                     newPeer = true;
                     knownPeers[message.id] = {};
                 }
+                if (knownPeers[message.id].missingTimeout) clearInterval(knownPeers[message.id].missingTimeout);
                 Object.assign(knownPeers[message.id], {
                     addr: rinfo.address,
                     port: message.port,
                     id: message.id,
-                    lastSeen: Date.now()
+                    lastSeen: Date.now(),
+                    missingChances: 3,
+                    missingTimeout: setInterval(() => {
+                        knownPeers[message.id].missingChances--;
+                        if (knownPeers[message.id].missingChances == 0) {
+                            clearInterval(knownPeers[message.id].missingTimeout);
+                            this.fire("lostPeer", message.id);
+                            delete knownPeers[message.id];
+                        }
+                    }, options.waitPeriod + 500)
                 })
                 for (let i of message.conreqs) {
                     if (i == id) {
@@ -209,6 +219,10 @@ module.exports = function nanogram(id, _options) {
                 s.end();
             }
         });
+        s.on("error", (e) => {
+            // don't die
+            console.log(e);
+        })
     })
 
     tcpserv.listen(options.transmitPort, "0.0.0.0");
