@@ -172,19 +172,20 @@ module.exports = function nanogram(id, _options) {
     let conreqs = {};
 
     //figure out which address(es) to broadcast on
-    let baddrs = [];
-    let infs = os.networkInterfaces();
-    for (let inf in infs) {
-        for (let addrblock of infs[inf]) {
-            if (addrblock.family == "IPv4" && addrblock.mac != "00:00:00:00:00:00") {
-                console.log(addrblock);
-                let nmn = addrblock.netmask.split(".").map(i => Number(i));
-                let na = addrblock.address.split(".").map(i => Number(i));
-                baddrs.push(na.map((v, i) => v | (255 ^ nmn[i])).join("."));
+    let fetchBroadcastAddresses = () => {
+        let baddrs = [];
+        let infs = os.networkInterfaces();
+        for (let inf in infs) {
+            for (let addrblock of infs[inf]) {
+                if (addrblock.family == "IPv4" && addrblock.mac != "00:00:00:00:00:00") {
+                    let nmn = addrblock.netmask.split(".").map(i => Number(i));
+                    let na = addrblock.address.split(".").map(i => Number(i));
+                    baddrs.push(na.map((v, i) => v | (255 ^ nmn[i])).join("."));
+                }
             }
         }
+        return baddrs;
     }
-    console.log(baddrs);
 
     setInterval(() => {
         let message = JSON.stringify({
@@ -193,6 +194,7 @@ module.exports = function nanogram(id, _options) {
             callWord: options.callWord,
             conreqs: Object.keys(conreqs)
         })
+        let baddrs = fetchBroadcastAddresses();
         for (let i of baddrs) {
             server.send(message, 0, message.length, options.udpPort, i);
         }
@@ -231,6 +233,9 @@ module.exports = function nanogram(id, _options) {
         return new Promise((res) => {
             if (targetID < id) {
                 // we need to create con
+                if (!knownPeers[targetID]) {
+                    throw "Peer cannot be found.";
+                }
                 if (knownPeers[targetID].conreq == true) {
                     let socket = net.createConnection({ host: knownPeers[targetID].addr, port: knownPeers[targetID].port }, () => {
                         socket.write(`nanogram_${id}`, () => {
