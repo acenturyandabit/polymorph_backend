@@ -152,20 +152,26 @@ function RTmanager() {
                     break;
             }
         });
-        this.sendMergeRequest = (source) => {
-            let timekeys = Object.entries(this.localCopy).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
-            let pow2 = 0;
-            let lus = timekeys.filter((i, ii) => {
-                if (!(ii % (2 ** pow2)) || ii == timekeys.length - 1) {
-                    pow2++;
-                    return true;
-                } else return false;
-            });
-            source.send(JSON.stringify({
-                type: "mergeCheck",
-                items: lus
-            }))
-        }
+        this.sendMergeRequest(source);
+        source.on("error", () => {
+            console.log("nanogram sent an error")
+                // if something bad happens to the source, abandon it.
+            this.sources.splice(this.sources.indexOf(source), 1);
+        });
+    }
+    this.sendMergeRequest = (source) => {
+        let timekeys = Object.entries(this.localCopy).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
+        let pow2 = 0;
+        let lus = timekeys.filter((i, ii) => {
+            if (!(ii % (2 ** pow2)) || ii == timekeys.length - 1) {
+                pow2++;
+                return true;
+            } else return false;
+        });
+        source.send(JSON.stringify({
+            type: "mergeCheck",
+            items: lus
+        }))
     }
 }
 
@@ -179,6 +185,10 @@ function TCPsource(tcpconn, id) {
         tcpconn.write(data + "\n");
         console.log("i reckon i sent a message");
     }
+    tcpconn.on("error", (e) => {
+        this.fire("error", e);
+        console.log("err fired upon")
+    });
 }
 
 module.exports = {
@@ -379,7 +389,7 @@ module.exports = {
         let RTmanagers = {};
 
         let prepareClient = (client) => {
-            console.log(client.id);
+            console.log("preparing " + client.id);
             let unhandledCommons = [];
             if (client.state == "begin") {
                 client.connection.write(JSON.stringify({
@@ -587,6 +597,11 @@ module.exports = {
             console.log("i have a friend" + id);
             client = await nng.connectTo(id);
             prepareClient(client);
+        });
+
+        nng.on("lostPeer", async(id) => {
+            console.log("i lost a friend" + id);
+            // the friend should go now
         });
 
         let wshtserver = http.createServer(function(request, response) {});
