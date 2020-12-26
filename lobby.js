@@ -4,6 +4,7 @@ let nanogram = require("./nanogram");
 let pmDataUtils = require("./polymorph_dataUtils");
 let WebSocketServer = require('websocket').server;
 let http = require('http');
+const { tmpdir } = require("os");
 
 let polymorph_core = {};
 pmDataUtils.addDataUtils(polymorph_core);
@@ -12,6 +13,34 @@ Tests
 - load from remote
 - sync two sided
 */
+
+function defaultBaseDocument(id) {
+    return ({
+        "_meta": {
+            "displayName": "New Polymorph Document",
+            "id": id,
+            "contextMenuItems": ["Delete::polymorph_core.deleteItem", "Background::item.edit(style.background)", "Foreground::item.edit(style.color)"],
+            "_lu_": 0,
+            "currentView": "default_container",
+            "globalContextMenuOptions": ["Style::Item Background::item.edit(item.style.background)", "Style::Text color::item.edit(item.style.color)"]
+        },
+        "default_container": {
+            "_rd": { "x": 0, "f": 0, "ps": 1, "s": "default_operator" },
+            "_lu_": 0
+        },
+        "default_operator": {
+            "_od": {
+                "t": "welcome",
+                "data": {},
+                "inputRemaps": {},
+                "outputRemaps": {},
+                "tabbarName": "Home",
+                "p": "default_container"
+            },
+            "_lu_": 0
+        }
+    })
+}
 
 let addEventAPI = (itm, errf = console.error) => {
     itm.events = {};
@@ -198,7 +227,7 @@ module.exports = {
         async function loadFile(f, decompress) {
             return new Promise((res) => {
                 let saveF = String(f).replace(/\./g, "_");
-                if (!fs.existsSync(private.lobbyFileLocation + "/" + saveF)) res({});
+                if (!fs.existsSync(private.lobbyFileLocation + "/" + saveF)) res(defaultBaseDocument(f));
                 fs.readdir(private.lobbyFileLocation + "/" + saveF, (err, files) => {
                     if (err || files.length == 0) {
                         res(undefined);
@@ -350,14 +379,17 @@ module.exports = {
             }
         });
 
-
         app.get("/lobbyload", async(req, res) => {
             if (!availList[req.query.f]) {
-                res.send("{}");
+                res.send(JSON.stringify(defaultBaseDocument(req.query.f)));
                 return; // document does not exist, probably bc user added savesource but made no changes and didnt save
             }
-            if (availList[req.query.f].type == "local") res.send(JSON.stringify(await loadFile(req.query.f)));
-            else {
+            if (availList[req.query.f].type == "local") {
+                let tmpDoc = await loadFile(req.query.f);
+                if (!tmpDoc) tmpDoc = defaultBaseDocument(req.query.f);
+                console.log("got here, tmpdoc was " + JSON.stringify(tmpDoc));
+                res.send(JSON.stringify(tmpDoc));
+            } else {
                 //pull from server -- which one? any one, they should be synced
                 while (availList[req.query.f].externHosts.length && !onlineClients[availList[req.query.f].externHosts[0]]) {
                     availList[req.query.f].externHosts.shift();
@@ -381,7 +413,6 @@ module.exports = {
                 });
                 res.send(JSON.stringify(await loadFile(req.query.f)));
                 res.end();
-
             }
         });
 
