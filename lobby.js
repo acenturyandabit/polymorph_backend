@@ -4,7 +4,6 @@ let nanogram = require("./nanogram");
 let pmDataUtils = require("./polymorph_dataUtils");
 let WebSocketServer = require('websocket').server;
 let http = require('http');
-const { tmpdir } = require("os");
 
 let polymorph_core = {};
 pmDataUtils.addDataUtils(polymorph_core);
