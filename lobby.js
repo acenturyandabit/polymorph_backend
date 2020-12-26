@@ -352,6 +352,10 @@ module.exports = {
 
 
         app.get("/lobbyload", async(req, res) => {
+            if (!availList[req.query.f]) {
+                res.send("{}");
+                return; // document does not exist, probably bc user added savesource but made no changes and didnt save
+            }
             if (availList[req.query.f].type == "local") res.send(JSON.stringify(await loadFile(req.query.f)));
             else {
                 //pull from server -- which one? any one, they should be synced
@@ -621,7 +625,11 @@ module.exports = {
                 if (m.type == "selfID") {
                     if (!RTmanagers[m.data]) {
                         RTmanagers[m.data] = new RTmanager();
-                        RTmanagers[m.data].encache(await loadFile(m.data, true));
+                        let tmpFile = await loadFile(m.data, true);
+                        if (tmpFile) RTmanagers[m.data].encache(tmpFile);
+                    }
+                    if (!availList[m.data]) {
+                        availList[m.data] = { id: m.data, type: "local" }
                     }
                     if (availList[m.data].externHosts) {
                         availList[m.data].externHosts.filter(i => {
