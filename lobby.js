@@ -233,40 +233,50 @@ module.exports = {
                         console.log(err);
                     } else {
                         latestTime = 0;
-                        files.forEach(i => {
-                            //console.log(i);
-                            let lastTimeRe = /.+?(\d+)\.json/.exec(i);
-                            if (lastTimeRe) {
-                                let lastTime = Number(lastTimeRe[1]);
-                                if (lastTime > latestTime) {
-                                    latestTime = lastTime;
-                                }
-                            }
-                        });
-                        if (latestTime != 0) {
-                            fs.readFile(path.join(private.lobbyFileLocation + "/" + saveF, saveF + "_" + latestTime + ".json"), (err, data) => {
-                                if (!data) return; // somehow files get deleted after they're made? how?
-                                data = data.toString();
-                                if (err) {
-                                    res(undefined);
-                                    console.log(err);
-                                } else {
-                                    if (decompress) {
-                                        try {
-                                            res(polymorph_core.datautils.decompress(JSON.parse(data)));
-                                        } catch (e) {
-                                            console.log(e);
-                                            console.log(data);
-                                            res(undefined);
-                                        }
-                                    } else {
-                                        res(JSON.parse(data));
+                        let retryLoadFile = () => {
+                            files.forEach(i => {
+                                //console.log(i);
+                                let lastTimeRe = /.+?(\d+)\.json/.exec(i);
+                                if (lastTimeRe) {
+                                    let lastTime = Number(lastTimeRe[1]);
+                                    if (lastTime > latestTime) {
+                                        latestTime = lastTime;
                                     }
                                 }
                             });
-                        } else {
-                            res(undefined);
-                        }
+                            if (latestTime != 0) {
+                                fs.readFile(path.join(private.lobbyFileLocation + "/" + saveF, saveF + "_" + latestTime + ".json"), (err, data) => {
+                                    if (!data) return; // somehow files get deleted after they're made? how?
+                                    data = data.toString();
+                                    if (err) {
+                                        res(undefined);
+                                        console.log(err);
+                                    } else {
+                                        if (decompress) {
+                                            try {
+                                                res(polymorph_core.datautils.decompress(JSON.parse(data)));
+                                            } catch (e) {
+                                                console.log(e);
+                                                console.log(data);
+                                                res(undefined);
+                                            }
+                                        } else {
+                                            try {
+                                                res(JSON.parse(data));
+                                            } catch (e) {
+                                                // delete this file and try again
+                                                fs.unlinkSync(path.join(private.lobbyFileLocation + "/" + saveF, saveF + "_" + latestTime + ".json"));
+                                                files.splice(files.indexOf(saveF + "_" + latestTime + ".json"), 1);
+                                                retryLoadFile();
+                                            }
+                                        }
+                                    }
+                                });
+                            } else {
+                                res(undefined);
+                            }
+                        };
+                        retryLoadFile();
                     }
                 })
             })
