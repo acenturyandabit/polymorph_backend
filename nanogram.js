@@ -237,17 +237,21 @@ module.exports = function nanogram(id, _options) {
                     throw "Peer cannot be found.";
                 }
                 if (knownPeers[targetID].conreq == true) {
-                    let socket = net.createConnection({ host: knownPeers[targetID].addr, port: knownPeers[targetID].port }, () => {
-                        socket.write(`nanogram_${id}`, () => {
-                            setTimeout(() => {
-                                res({
-                                    connection: socket,
-                                    id: targetID,
-                                    state: "begin"
-                                }); // otherwise first message is merged w nanogram id.
-                            }, 100);
+                    try {
+                        let socket = net.createConnection({ host: knownPeers[targetID].addr, port: knownPeers[targetID].port }, () => {
+                            socket.write(`nanogram_${id}`, () => {
+                                setTimeout(() => {
+                                    res({
+                                        connection: socket,
+                                        id: targetID,
+                                        state: "begin"
+                                    }); // otherwise first message is merged w nanogram id.
+                                }, 100);
+                            });
                         });
-                    });
+                    } catch (e) {
+                        console.log("Connection attempt failed: " + e.toString());
+                    }
                 } else { // will overwrite previous conreqs. TODO: make array? 
                     knownPeers[targetID].conreq = res;
                 }
