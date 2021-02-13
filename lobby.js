@@ -257,7 +257,7 @@ module.exports = {
                                                 res(polymorph_core.datautils.decompress(JSON.parse(data)));
                                             } catch (e) {
                                                 console.log(e);
-                                                console.log(data);
+                                                //console.log(data);
                                                 res(undefined);
                                             }
                                         } else {
@@ -325,6 +325,7 @@ module.exports = {
 
         await (new Promise((res, rej) => {
             fs.readdir(private.lobbyFileLocation, { withFileTypes: true }, (err, files) => {
+                if (err) console.log(err);
                 for (let f of files) {
                     if (f.isDirectory()) {
                         availList[f.name] = {
@@ -336,6 +337,7 @@ module.exports = {
                 res();
             });
         }));
+        console.log(private.lobbyFileLocation);
 
         app.get("/lobby", async(req, res) => {
             //get more from nanogram

@@ -27,6 +27,12 @@ saveloader.prepare(app, private);
 var gitlite = require("./gitlite");
 gitlite.prepare(app, private);
 
+
+if (private.imageFileLocation) { // dont want this on the linode
+    var imageServer = require("./imageServer");
+    imageServer.prepare(app, private);
+}
+
 if (private.lobbyFileLocation) { // dont want this on the linode
     var lobby = require("./lobby");
     lobby.prepare(app, private);

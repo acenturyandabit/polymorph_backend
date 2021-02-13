@@ -249,6 +249,13 @@ module.exports = function nanogram(id, _options) {
                                 }, 100);
                             });
                         });
+                        socket.on('error', (e) => {
+                            console.log(e);
+                            // retry
+                            setTimeout(() => {
+                                this.connectTo(targetID);
+                            }, 3000);
+                        })
                     } catch (e) {
                         console.log("Connection attempt failed: " + e.toString());
                     }
