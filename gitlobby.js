@@ -384,7 +384,7 @@ function FileManager(filename, basepath) {
     }
 
     this.attachRemote = (connection, ID) => {
-        this.remotes[id] = connection;
+        this.remotes[ID] = connection;
         // check settings of the remote and initiate a pull if we want
         if (!this.settings.permissions[ID]) this.settings.permissions[ID] = "conflict"; // for now
         if (this.settings.permissions[ID] == "overwrite" || this.settings.permissions[ID] == "conflict") {
@@ -539,11 +539,14 @@ module.exports = {
         let RTmanagers = {};
 
         let prepareClient = (client) => {
-            console.log("Hello i have a nng gitlite client");
             if (client.state == "begin") {
                 client.connection.write(JSON.stringify({
                     op: "pushAvailList",
-                    list: Object.values(availList).filter(i => i.type == "local"),
+                    list: Object.values(availList).filter(i => i.type == "local").map(i => {
+                        let u = JSON.parse(JSON.stringify(i));
+                        delete u.fileManager;
+                        return u;
+                    }),
                     RTList: Object.keys(RTmanagers)
                 }) + "\n");
             }
@@ -582,9 +585,6 @@ module.exports = {
                                 if (!availList[i.id].fileManager) {
                                     availList[i.id].fileManager = new FileManager(i.id, private.baseGitLocation + "/" + i.id);
                                 }
-                                console.log(availList, i.id);
-                                console.log(availList[i.id].fileManager.headCommit);
-                                console.log(availList[i.id].fileManager.attachRemote);
                                 availList[i.id].fileManager.attachRemote(client.connection, client.ID); // it is responsible for the pull, and setting up listener websockets and whatnot
                             }
                             break;
