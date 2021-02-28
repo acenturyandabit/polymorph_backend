@@ -24,8 +24,8 @@ app.use(cors());
 var saveloader = require("./saveload");
 saveloader.prepare(app, private);
 
-var gitlite = require("./gitlite");
-gitlite.prepare(app, private);
+//var gitlite = require("./gitlite");
+//gitlite.prepare(app, private);
 
 
 if (private.imageFileLocation) { // dont want this on the linode
@@ -35,5 +35,10 @@ if (private.imageFileLocation) { // dont want this on the linode
 
 if (private.lobbyFileLocation) { // dont want this on the linode
     var lobby = require("./lobby");
+    lobby.prepare(app, private);
+}
+
+if (private.baseGitLocation) { // dont want this on the linode
+    var lobby = require("./gitlobby");
     lobby.prepare(app, private);
 }

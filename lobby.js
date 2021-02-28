@@ -398,7 +398,7 @@ module.exports = {
             if (availList[req.query.f].type == "local") {
                 let tmpDoc = await loadFile(req.query.f);
                 if (!tmpDoc) tmpDoc = defaultBaseDocument(req.query.f);
-                console.log("got here, tmpdoc was " + JSON.stringify(tmpDoc));
+                //console.log("got here, tmpdoc was " + JSON.stringify(tmpDoc));
                 res.send(JSON.stringify(tmpDoc));
             } else {
                 //pull from server -- which one? any one, they should be synced
