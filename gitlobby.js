@@ -574,15 +574,15 @@ module.exports = {
                                 if (!availList[i.id].fileManager) {
                                     availList[i.id].fileManager = new FileManager(i.id, private.baseGitLocation + "/" + i.id);
                                 }
-                                availList[i.id].fileManager.attachRemote(client.connection, client.ID); // it is responsible for the pull, and setting up listener websockets and whatnot
+                                availList[i.id].fileManager.attachRemote(client.connection, client.id); // it is responsible for the pull, and setting up listener websockets and whatnot
                             }
                             break;
                         case "fmMessage":
                             if (!availList[data.docID].fileManager) {
                                 availList[data.docID].fileManager = new FileManager(data.docID, private.baseGitLocation + "/" + data.docID);
-                                availList[data.docID].fileManager.attachRemote(client.connection, client.ID);
+                                availList[data.docID].fileManager.attachRemote(client.connection, client.id);
                             }
-                            availList[data.docID].fileManager.handleRemoteMessage(data, client.ID);
+                            availList[data.docID].fileManager.handleRemoteMessage(data, client.id);
                             break;
                     }
                 }
