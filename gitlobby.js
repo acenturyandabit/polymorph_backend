@@ -402,11 +402,13 @@ function FileManager(filename, basepath) {
                     type: "headCommitSend",
                     data: this.headCommit
                 }); // more efficient way of doing this is possible but eh for now.
+                console.log("sent headcommit to " + remoteID);
                 break;
             case "headCommitSend":
                 //recieve the head
                 if (this.remoteCommitWaiters[remoteID]) {
                     data.data.remote = remoteID;
+                    console.log("got headcommit fr " + remoteID);
                     this.remoteCommitWaiters[remoteID](data.data);
                     delete this.remoteCommitWaiters[remoteID];
                 }
@@ -429,6 +431,7 @@ function FileManager(filename, basepath) {
     }
     this.remoteCommitWaiters = {};
     this.pullFromRemote = async() => {
+        console.log("pulling from remote...");
         // pull all overwrite-class heads and use the latest one (store it for retrieval from collate)
         let remotesToPullFrom = [];
         remotesToPullFrom = Object.entries(this.settings.permissions).filter(i => i[1] == "overwrite").map(i => i[0]);
@@ -439,8 +442,11 @@ function FileManager(filename, basepath) {
             let mostRecents = remotesToPullFrom.map(i => new Promise((res) => {
                 this.remoteCommitWaiters[i] = res;
                 this.remotes[i].write(JSON.stringify({ op: "fmMessage", type: "fetchHeadCommit" }));
+                console.log("sent fetchhead to " + i);
             }));
             await Promise.all(mostRecents);
+            console.log("yay i got the commits");
+            console.log(mostRecents);
             mostRecents.sort((a, b) => a.timestamp - b.timestamp);
             await new Promise((res) => {
                 this.remoteCallbacks[mostRecents[0].remote]["pull"] = res;
