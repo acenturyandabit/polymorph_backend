@@ -392,6 +392,8 @@ function FileManager(filename, basepath) {
             connection.send({ op: "fmMessage", type: "pull" });
         }
     }
+    console.log(this.attachRemote);
+    console.log(this);
 
     this.handleRemoteMessage = (data, remoteID) => {
         switch (data.type) {
@@ -537,7 +539,7 @@ module.exports = {
         let RTmanagers = {};
 
         let prepareClient = (client) => {
-            let unhandledCommons = [];
+            console.log("Hello i have a nng gitlite client");
             if (client.state == "begin") {
                 client.connection.write(JSON.stringify({
                     op: "pushAvailList",
