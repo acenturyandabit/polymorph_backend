@@ -565,7 +565,6 @@ module.exports = {
                         console.log(data);
                     }
                     console.log(data.op, client.id);
-                    let composedMessage;
                     switch (data.op) {
                         case "pushAvailList":
                             let remoteList = data.list;
@@ -583,6 +582,7 @@ module.exports = {
                                 }
                                 availList[i.id].fileManager.addClient(client.connection, client.ID); // it is responsible for the pull, and setting up listener websockets and whatnot
                             }
+                            console.log(availList);
                             break;
                         case "fmMessage":
                             if (!availList[data.docID].fileManager) {
