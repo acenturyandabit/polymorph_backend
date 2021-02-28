@@ -394,6 +394,8 @@ function FileManager(filename, basepath) {
     }
 
     this.handleRemoteMessage = (data, remoteID) => {
+        console.log("got a message fr " + remoteID);
+        console.log(data)
         switch (data.type) {
             case "fetchHeadCommit":
                 //send over my head
