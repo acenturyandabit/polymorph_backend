@@ -580,7 +580,7 @@ module.exports = {
                                 if (!availList[i.id].fileManager) {
                                     availList[i.id].fileManager = new FileManager(i.id, private.baseGitLocation + "/" + i.id);
                                 }
-                                availList[i.id].fileManager.addClient(client.connection, client.ID); // it is responsible for the pull, and setting up listener websockets and whatnot
+                                availList[i.id].fileManager.attachRemote(client.connection, client.ID); // it is responsible for the pull, and setting up listener websockets and whatnot
                             }
                             console.log(availList);
                             break;
