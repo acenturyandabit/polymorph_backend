@@ -523,17 +523,16 @@ module.exports = {
         let RTmanagers = {};
 
         let prepareClient = (client) => {
-            if (client.state == "begin") {
-                client.connection.write(JSON.stringify({
-                    op: "pushAvailList",
-                    list: Object.values(availList).filter(i => i.type == "local").map(i => {
-                        let u = JSON.parse(JSON.stringify(i));
-                        delete u.fileManager;
-                        return u;
-                    }),
-                    RTList: Object.keys(RTmanagers)
-                }) + "\n");
-            }
+            console.log("glite preparing " + client.id);
+            client.connection.write(JSON.stringify({
+                op: "pushAvailList",
+                list: Object.values(availList).filter(i => i.type == "local").map(i => {
+                    let u = JSON.parse(JSON.stringify(i));
+                    delete u.fileManager;
+                    return u;
+                }),
+                RTList: Object.keys(RTmanagers)
+            }) + "\n");
             onlineClients[client.id] = client;
             let prevChunk = "";
             client.TCPsources = {};

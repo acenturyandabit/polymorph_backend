@@ -107,7 +107,7 @@ function RTmanager() {
     }
 
     this.attach = (source) => {
-        console.log("attaching source of type " + source.__proto__.constructor.name);
+        //console.log("attaching source of type " + source.__proto__.constructor.name);
         this.sources.push(source);
         source.on("message", (data) => {
             data = JSON.parse(data.utf8Data);
@@ -182,8 +182,8 @@ function RTmanager() {
         });
         this.sendMergeRequest(source);
         source.on("error", () => {
-            console.log("nanogram sent an error")
-                // if something bad happens to the source, abandon it.
+            //console.log("nanogram sent an error")
+            // if something bad happens to the source, abandon it.
             this.sources.splice(this.sources.indexOf(source), 1);
         });
     }
