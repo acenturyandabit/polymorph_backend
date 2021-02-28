@@ -274,7 +274,7 @@ function FileManager(filename, basepath) {
         this.remotes = this.remotes.filter(i => {
             if (!i.connected) return false;
             else {
-                i.send(JSON.stringify(msg));
+                i.write(JSON.stringify(msg));
             }
         })
     }
@@ -389,17 +389,15 @@ function FileManager(filename, basepath) {
         if (!this.settings.permissions[ID]) this.settings.permissions[ID] = "conflict"; // for now
         if (this.settings.permissions[ID] == "overwrite" || this.settings.permissions[ID] == "conflict") {
             //pull changes. what does pull changes mean? 
-            connection.send({ op: "fmMessage", type: "pull" });
+            connection.write({ op: "fmMessage", type: "pull" });
         }
     }
-    console.log(this.attachRemote);
-    console.log(this);
 
     this.handleRemoteMessage = (data, remoteID) => {
         switch (data.type) {
             case "fetchHeadCommit":
                 //send over my head
-                this.remotes[remoteID].send({
+                this.remotes[remoteID].write({
                     op: "fmMessage",
                     type: "headCommitSend",
                     data: this.headCommit
@@ -415,7 +413,7 @@ function FileManager(filename, basepath) {
                 break;
             case "pull":
                 //send over my head
-                this.remotes[remoteID].send({
+                this.remotes[remoteID].write({
                     op: "fmMessage",
                     type: "pullSend",
                     data: this.collateForClient()
@@ -440,31 +438,17 @@ function FileManager(filename, basepath) {
         if (remotesToPullFrom.length) {
             let mostRecents = remotesToPullFrom.map(i => new Promise((res) => {
                 this.remoteCommitWaiters[i] = res;
-                this.remotes[i].send({ op: "fmMessage", type: "fetchHeadCommit" });
+                this.remotes[i].write({ op: "fmMessage", type: "fetchHeadCommit" });
             }));
             await Promise.all(mostRecents);
             mostRecents.sort((a, b) => a.timestamp - b.timestamp);
             await new Promise((res) => {
                 this.remoteCallbacks[mostRecents[0].remote]["pull"] = res;
-                this.remotes[mostRecents[0].remote].send({ op: "fmMessage", type: "pull" });
+                this.remotes[mostRecents[0].remote].write({ op: "fmMessage", type: "pull" });
             });
         }
     }
 
-    this.sendMergeRequest = (source) => {
-        let timekeys = Object.entries(this.localCopy).map((i) => ({ _lu_: i[1]._lu_, id: i[0] })).sort((a, b) => b._lu_ - a._lu_);
-        let pow2 = 0;
-        let lus = timekeys.filter((i, ii) => {
-            if (!(ii % (2 ** pow2)) || ii == timekeys.length - 1) {
-                pow2++;
-                return true;
-            } else return false;
-        });
-        source.send(JSON.stringify({
-            type: "mergeCheck",
-            items: lus
-        }))
-    }
 }
 
 
