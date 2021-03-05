@@ -396,13 +396,15 @@ function FileManager(docID, basepath) {
         })
     }
 
-    this.attachRemote = (connection, ID) => {
+    this.attachRemote = (connection, ID, soft) => {
         this.remotes[ID] = connection;
-        // check settings of the remote and initiate a pull if we want
-        if (!this.settings.permissions[ID]) this.settings.permissions[ID] = "conflict"; // for now
-        if (this.settings.permissions[ID] == "overwrite" || this.settings.permissions[ID] == "conflict") {
-            //pull changes. what does pull changes mean? 
-            this.sendToRemote(ID, { op: "fmMessage", type: "pull" });
+        if (!soft) {
+            // check settings of the remote and initiate a pull if we want
+            if (!this.settings.permissions[ID]) this.settings.permissions[ID] = "conflict"; // for now
+            if (this.settings.permissions[ID] == "overwrite" || this.settings.permissions[ID] == "conflict") {
+                //pull changes. what does pull changes mean? 
+                this.sendToRemote(ID, { op: "fmMessage", type: "pull" });
+            }
         }
     }
 
@@ -460,6 +462,7 @@ function FileManager(docID, basepath) {
                 this.remoteCommitWaiters[i] = res;
                 this.sendToRemote(i, { op: "fmMessage", type: "fetchHeadCommit" });
                 console.log("sent fetchhead to " + i);
+                setTimeout(() => { res({}) }, 10000); // 10s timeout
             }));
             await Promise.all(mostRecents);
             console.log("yay i got the commits");
@@ -597,6 +600,8 @@ module.exports = {
                             }
                             break;
                         case "fmMessage":
+                            // since we only enrol other's remotes, gotta enrol on our side too
+                            availList[data.docID].fileManager.attachRemote(client.connection, client.id, true);
                             if (!availList[data.docID]) {
                                 availList[data.docID] = {
                                     type: "remote",
