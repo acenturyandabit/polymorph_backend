@@ -471,6 +471,7 @@ function FileManager(docID, basepath) {
             console.log("yay i got the commits");
             console.log(mostRecents);
             mostRecents.sort((a, b) => a.timestamp - b.timestamp);
+            console.log("pulling from " + mostRecents[0].remote);
             let oldPermission = this.settings.permissions[mostRecents[0].remote]; // if pulling from a conflict source, temporarily allow overwrites so we actually get items
             this.settings.permissions[mostRecents[0].remote] = "overwrite";
             await new Promise((res) => {
