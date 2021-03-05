@@ -245,6 +245,7 @@ function FileManager(docID, basepath) {
 
 
     this.collateForClient = () => {
+        console.log("compiling...");
         if (!this.isLoaded) this.loadFromDisk();
         let doc = {};
         Object.entries(this.headCommit.items).forEach(i => {
@@ -439,6 +440,7 @@ function FileManager(docID, basepath) {
                 break;
             case "pull":
                 //send over my head
+                console.log("here are my thingies");
                 this.sendToRemote(remoteID, {
                     op: "fmMessage",
                     type: "pullSend",
