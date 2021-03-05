@@ -549,6 +549,7 @@ module.exports = {
             client.TCPsources = {};
             client.connection.on("data", async(data) => {
                 data = prevChunk + data.toString();
+                console.log(data);
                 if (!data.endsWith("\n")) {
                     prevChunk = data;
                     return;
