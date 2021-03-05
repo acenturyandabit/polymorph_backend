@@ -302,7 +302,7 @@ function FileManager(filename, basepath) {
     }
 
     this.sendToRemote = (id, obj) => {
-        this.remotes[id].write(JSON.stringify(obj) + "\n");
+        this.remotes[id].write(JSON.stringify(obj) + "\n\n");
     }
     this.checkEnrolItem = (key, item) => {
         let writeHashedItem = (key, h, item) => {
