@@ -4,12 +4,13 @@ const fs = require("fs");
 var app = express();
 var bodyParser = require('body-parser');
 
-var private = require('./private');
+var private = require(process.argv[3] || './private');
 
+var port = process.argv[2] || 8080;
 
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(express.static('polymorph'));
-app.listen(8080);
+app.listen(port);
 
 app.use(cors());
 

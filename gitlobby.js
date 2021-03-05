@@ -301,6 +301,9 @@ function FileManager(filename, basepath) {
 
     }
 
+    this.sendToRemote = (id, obj) => {
+        this.remotes[id].write(JSON.stringify(obj) + "\n");
+    }
     this.checkEnrolItem = (key, item) => {
         let writeHashedItem = (key, h, item) => {
             this.itemChunks[key][h] = JSON.stringify(item);
@@ -389,7 +392,7 @@ function FileManager(filename, basepath) {
         if (!this.settings.permissions[ID]) this.settings.permissions[ID] = "conflict"; // for now
         if (this.settings.permissions[ID] == "overwrite" || this.settings.permissions[ID] == "conflict") {
             //pull changes. what does pull changes mean? 
-            connection.write(JSON.stringify({ op: "fmMessage", type: "pull" }));
+            this.sendToRemote(ID, { op: "fmMessage", type: "pull" });
         }
     }
 
@@ -399,7 +402,7 @@ function FileManager(filename, basepath) {
         switch (data.type) {
             case "fetchHeadCommit":
                 //send over my head
-                this.remotes[remoteID].write({
+                this.sendToRemote(remoteID, {
                     op: "fmMessage",
                     type: "headCommitSend",
                     data: this.headCommit
@@ -417,11 +420,11 @@ function FileManager(filename, basepath) {
                 break;
             case "pull":
                 //send over my head
-                this.remotes[remoteID].write(JSON.stringify({
+                this.sendToRemote(remoteID, {
                     op: "fmMessage",
                     type: "pullSend",
                     data: this.collateForClient()
-                })); // more efficient way of doing this is possible but eh for now.
+                }); // more efficient way of doing this is possible but eh for now.
                 break;
             case "pullSend":
                 //recieve the head
@@ -443,7 +446,7 @@ function FileManager(filename, basepath) {
         if (remotesToPullFrom.length) {
             let mostRecents = remotesToPullFrom.map(i => new Promise((res) => {
                 this.remoteCommitWaiters[i] = res;
-                this.remotes[i].write(JSON.stringify({ op: "fmMessage", type: "fetchHeadCommit" }));
+                this.sendToRemote(i, { op: "fmMessage", type: "fetchHeadCommit" });
                 console.log("sent fetchhead to " + i);
             }));
             await Promise.all(mostRecents);
