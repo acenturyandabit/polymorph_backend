@@ -478,6 +478,7 @@ function FileManager(docID, basepath) {
             mostRecents.sort((a, b) => a.timestamp - b.timestamp);
             console.log("pulling from " + mostRecents[0]);
             console.log("pulling from " + mostRecents[0].remote);
+            this.headCommit = mostRecents[0];
             let oldPermission = this.settings.permissions[mostRecents[0].remote]; // if pulling from a conflict source, temporarily allow overwrites so we actually get items
             this.settings.permissions[mostRecents[0].remote] = "overwrite";
             await new Promise((res) => {
@@ -549,7 +550,9 @@ module.exports = {
                 }
                 //temporary overwrite
                 await availList[req.query.f].fileManager.pullFromRemote();
-                res.send(availList[req.query.f].fileManager.collateForClient());
+                console.log("finished pulling from remote");
+                console.log("final collated was " + JSON.stringify(availList[req.query.f].fileManager.collateForClient()));
+                res.send(JSON.stringify(availList[req.query.f].fileManager.collateForClient()));
             }
         });
 
