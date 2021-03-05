@@ -482,7 +482,7 @@ function FileManager(docID, basepath) {
             this.settings.permissions[mostRecents[0].remote] = "overwrite";
             await new Promise((res) => {
                 this.remoteCallbacks[mostRecents[0].remote]["pull"] = res;
-                this.remotes[mostRecents[0].remote].write(JSON.stringify({ op: "fmMessage", type: "pull" }));
+                this.sendToRemote(mostRecents[0].remote, { op: "fmMessage", type: "pull" });
             });
             this.settings.permissions[mostRecents[0].remote] = oldPermission;
         }
@@ -579,7 +579,7 @@ module.exports = {
             client.TCPsources = {};
             client.connection.on("data", async(data) => {
                 data = prevChunk + data.toString();
-                console.log(data);
+                console.log("nng got " + data);
                 if (!data.includes("\n")) {
                     prevChunk = data;
                     return;
