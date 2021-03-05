@@ -389,6 +389,7 @@ function FileManager(docID, basepath) {
 
         }
         //send the commit to everyone else (todo)
+        console.log("processing as commit: ")
         console.log(this.headCommit);
         // write the head commit
         fs.writeFileSync(commitHeadPath, JSON.stringify(this.headCommit));
@@ -452,7 +453,7 @@ function FileManager(docID, basepath) {
                 if (this.settings.permissions[remoteID] == "overwrite") {
                     this.processItemsAsCommit(data.data);
                 }
-                if (this.remoteCallbacks[remoteID]["pull"]) res();
+                if (this.remoteCallbacks[remoteID]["pull"]) this.remoteCallbacks[remoteID]["pull"]();
                 break;
         }
     }
