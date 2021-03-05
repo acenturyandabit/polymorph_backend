@@ -367,14 +367,14 @@ function FileManager(docID, basepath) {
         if (source == "LOCAL" || this.settings.permissions[source] == "overwrite") {
             let changes = [];
             for (let k in commit.items) {
-                if (!this.headCommit[k] || this.headCommit[k] != commit.items[k]) {
-                    this.headCommit[k] = commit.items[k];
+                if (!this.headCommit.items[k] || this.headCommit.items[k] != commit.items[k]) {
+                    this.headCommit.items[k] = commit.items[k];
                     changes.push(k);
                 }
             }
-            for (let k in this.headCommit) {
+            for (let k in this.headCommit.items) {
                 if (!commit.items[k]) {
-                    delete this.headCommit[k];
+                    delete this.headCommit.items[k];
                     changes.push(k);
                 }
             }
@@ -421,7 +421,9 @@ function FileManager(docID, basepath) {
                 this.sendToRemote(remoteID, {
                     op: "fmMessage",
                     type: "headCommitSend",
-                    data: this.headCommit
+                    data: {
+                        commit: this.headCommit
+                    }
                 }); // more efficient way of doing this is possible but eh for now.
                 console.log("sent headcommit to " + remoteID);
                 break;
@@ -471,6 +473,7 @@ function FileManager(docID, basepath) {
             console.log("yay i got the commits");
             console.log(mostRecents);
             mostRecents.sort((a, b) => a.timestamp - b.timestamp);
+            console.log("pulling from " + mostRecents[0]);
             console.log("pulling from " + mostRecents[0].remote);
             let oldPermission = this.settings.permissions[mostRecents[0].remote]; // if pulling from a conflict source, temporarily allow overwrites so we actually get items
             this.settings.permissions[mostRecents[0].remote] = "overwrite";
