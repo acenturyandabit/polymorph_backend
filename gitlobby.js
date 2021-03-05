@@ -470,7 +470,7 @@ function FileManager(docID, basepath) {
                 console.log("sent fetchhead to " + i);
                 setTimeout(() => { res({ timestamp: -1, remote: i }) }, 10000); // 10s timeout
             }));
-            await Promise.all(mostRecents);
+            mostRecents = await Promise.all(mostRecents);
             console.log("yay i got the commits");
             console.log(mostRecents);
             mostRecents.sort((a, b) => a.timestamp - b.timestamp);
