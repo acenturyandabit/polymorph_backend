@@ -398,6 +398,7 @@ function FileManager(docID, basepath) {
 
     this.attachRemote = (connection, ID, soft) => {
         this.remotes[ID] = connection;
+        this.remoteCallbacks[ID] = {};
         if (!soft) {
             // check settings of the remote and initiate a pull if we want
             if (!this.settings.permissions[ID]) this.settings.permissions[ID] = "conflict"; // for now
@@ -445,6 +446,7 @@ function FileManager(docID, basepath) {
                 if (this.settings.permissions[remoteID] == "overwrite") {
                     this.processItemsAsCommit(data.data);
                 }
+                if (this.remoteCallbacks[remoteID]["pull"]) res();
                 break;
         }
     }
@@ -462,16 +464,19 @@ function FileManager(docID, basepath) {
                 this.remoteCommitWaiters[i] = res;
                 this.sendToRemote(i, { op: "fmMessage", type: "fetchHeadCommit" });
                 console.log("sent fetchhead to " + i);
-                setTimeout(() => { res({}) }, 10000); // 10s timeout
+                setTimeout(() => { res({ timestamp: -1, remote: i }) }, 10000); // 10s timeout
             }));
             await Promise.all(mostRecents);
             console.log("yay i got the commits");
             console.log(mostRecents);
             mostRecents.sort((a, b) => a.timestamp - b.timestamp);
+            let oldPermission = this.settings.permissions[mostRecents[0].remote]; // if pulling from a conflict source, temporarily allow overwrites so we actually get items
+            this.settings.permissions[mostRecents[0].remote] = "overwrite";
             await new Promise((res) => {
                 this.remoteCallbacks[mostRecents[0].remote]["pull"] = res;
                 this.remotes[mostRecents[0].remote].write(JSON.stringify({ op: "fmMessage", type: "pull" }));
             });
+            this.settings.permissions[mostRecents[0].remote] = oldPermission;
         }
     }
 
@@ -534,6 +539,7 @@ module.exports = {
                 if (!availList[req.query.f].fileManager) {
                     availList[req.query.f].fileManager = new FileManager(req.query.f, private.baseGitLocation + "/" + req.query.f);
                 }
+                //temporary overwrite
                 await availList[req.query.f].fileManager.pullFromRemote();
                 res.send(availList[req.query.f].fileManager.collateForClient());
             }
