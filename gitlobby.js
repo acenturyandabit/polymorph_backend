@@ -200,6 +200,7 @@ function FileManager(docID, basepath) {
     this.itemChunks = {};
     this.commitHistory = {};
     this.remoteCommitWaiters = {};
+    this.remoteCallbacks = {};
     this.settings = {
         permissions: {},
         defaultPermission: "retrieve"
