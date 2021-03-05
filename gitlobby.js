@@ -186,8 +186,8 @@ let fileNameSafeEscape = {
     }
 }
 
-function FileManager(filename, basepath) {
-    this.fileName = filename;
+function FileManager(docID, basepath) {
+    this.docID = docID;
     this.basepath = basepath;
 
     let itemChunksPath = `${basepath}/ichnk`; // will this need rewrites: no never
@@ -244,10 +244,12 @@ function FileManager(filename, basepath) {
         if (!this.isLoaded) this.loadFromDisk();
         let doc = {};
         Object.entries(this.headCommit).forEach(i => {
-            doc[i[0]] = this.itemChunks[i[0]][i[1]];
+            if (this.itemChunks[i[0]]) {
+                doc[i[0]] = this.itemChunks[i[0]][i[1]];
+            } else {
+                console.log(`err: ${i[0]} not found from hcommit`);
+            }
         });
-        console.log(doc);
-        console.log(this.headCommit);
         return doc;
     }
 
@@ -302,6 +304,7 @@ function FileManager(filename, basepath) {
     }
 
     this.sendToRemote = (id, obj) => {
+        obj.docID = this.docID;
         this.remotes[id].write(JSON.stringify(obj) + "\n");
     }
     this.checkEnrolItem = (key, item) => {
@@ -326,8 +329,9 @@ function FileManager(filename, basepath) {
         } else {
             let _ihash = ihash;
             let counter = 0;
-            while (this.itemChunks[key][_ihash] && this.itemChunks[key][_ihash] != stringedItem) {
+            while (this.itemChunks[key][_ihash] && JSON.stringify(this.itemChunks[key][_ihash]) != stringedItem) {
                 _ihash = ihash + "_" + counter;
+                counter++;
             }
             if (!this.itemChunks[key][_ihash]) {
                 writeHashedItem(key, _ihash, item);
@@ -377,6 +381,8 @@ function FileManager(filename, basepath) {
         }
         //send the commit to everyone else (todo)
         console.log(this.headCommit);
+        // write the head commit
+        fs.writeFileSync(commitHeadPath, JSON.stringify(this.headCommit));
     }
 
     this.attachClient = (client) => {
@@ -402,6 +408,8 @@ function FileManager(filename, basepath) {
         switch (data.type) {
             case "fetchHeadCommit":
                 //send over my head
+                if (!this.isLoaded) this.loadFromDisk();
+                console.log(this.headCommit);
                 this.sendToRemote(remoteID, {
                     op: "fmMessage",
                     type: "headCommitSend",
