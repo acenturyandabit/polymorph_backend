@@ -584,6 +584,12 @@ module.exports = {
                             }
                             break;
                         case "fmMessage":
+                            if (!availList[data.docID]) {
+                                availList[data.docID] = {
+                                    type: "remote",
+                                    hostID: client.id
+                                };
+                            }
                             if (!availList[data.docID].fileManager) {
                                 availList[data.docID].fileManager = new FileManager(data.docID, private.baseGitLocation + "/" + data.docID);
                                 availList[data.docID].fileManager.attachRemote(client.connection, client.id);
