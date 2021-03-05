@@ -196,7 +196,10 @@ function FileManager(docID, basepath) {
     let settingsPath = `${basepath}/settings.json`; // will this need rewrites: yes, frequently
     let conflictsPath = `${basepath}/conflicts.json`; // will this need rewrites: yes, frequently
 
-    this.headCommit = {};
+    this.headCommit = {
+        items: {},
+        timestamp: 0
+    };
     this.itemChunks = {};
     this.commitHistory = {};
     this.remoteCommitWaiters = {};
@@ -421,9 +424,7 @@ function FileManager(docID, basepath) {
                 this.sendToRemote(remoteID, {
                     op: "fmMessage",
                     type: "headCommitSend",
-                    data: {
-                        commit: this.headCommit
-                    }
+                    data: this.headCommit
                 }); // more efficient way of doing this is possible but eh for now.
                 console.log("sent headcommit to " + remoteID);
                 break;
