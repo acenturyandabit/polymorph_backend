@@ -550,7 +550,7 @@ module.exports = {
             client.connection.on("data", async(data) => {
                 data = prevChunk + data.toString();
                 console.log(data);
-                if (!data.endsWith("\n")) {
+                if (!data.includes("\n")) {
                     prevChunk = data;
                     return;
                 }
