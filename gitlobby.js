@@ -305,13 +305,17 @@ function FileManager(docID, basepath) {
 
     this.sendToRemote = (id, obj) => {
         obj.docID = this.docID;
-        this.remotes[id].write(JSON.stringify(obj) + "\n");
+        if (this.remotes[id]) {
+            this.remotes[id].write(JSON.stringify(obj) + "\n");
+        } else {
+            console.log(`remote ${id} did not exist!`);
+        }
     }
     this.checkEnrolItem = (key, item) => {
         let writeHashedItem = (key, h, item) => {
             this.itemChunks[key][h] = JSON.stringify(item);
             if (!fs.existsSync(itemChunksPath)) {
-                fs.mkdirSync(itemChunksPath);
+                fs.mkdirSync(itemChunksPath, { recursive: true });
             }
             if (!fs.existsSync(itemChunksPath + "/" + fileNameSafeEscape.encodeFileName(key) + ".json")) {
                 fs.writeFileSync(itemChunksPath + "/" + fileNameSafeEscape.encodeFileName(key) + ".json", JSON.stringify({ h: h, i: item }) + "\n");
@@ -512,6 +516,7 @@ module.exports = {
         });
 
         app.get("/gitload", async(req, res) => {
+            console.log("asked for load");
             if (!availList[req.query.f]) {
                 res.send(JSON.stringify(defaultBaseDocument(req.query.f)));
                 return; // document does not exist, probably bc user added savesource but made no changes and didnt save
