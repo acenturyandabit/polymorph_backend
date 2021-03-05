@@ -247,7 +247,7 @@ function FileManager(docID, basepath) {
     this.collateForClient = () => {
         if (!this.isLoaded) this.loadFromDisk();
         let doc = {};
-        Object.entries(this.headCommit).forEach(i => {
+        Object.entries(this.headCommit.items).forEach(i => {
             if (this.itemChunks[i[0]]) {
                 doc[i[0]] = this.itemChunks[i[0]][i[1]];
             } else {
