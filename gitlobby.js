@@ -284,6 +284,7 @@ function FileManager(docID, basepath) {
             if (!this.remotes[r].connected) {
                 delete this.remotes[r]
             } else {
+                console.log("sent to " + r);
                 this.sendToRemote(r, obj);
             }
         }
@@ -381,6 +382,7 @@ function FileManager(docID, basepath) {
             this.RTPushChangesLocally(changes);
             fs.writeFileSync(commitHeadPath, JSON.stringify(this.headCommit));
             if (source == "LOCAL") {
+                console.log("broadcasting to remotes:");
                 this.broadcastToRemotes({
                     op: "fmMessage",
                     type: "commitSend",
