@@ -353,6 +353,8 @@ function FileManager(docID, basepath) {
     }
 
     this.processItemsAsCommit = (items, source) => {
+        console.log("processing commit, items was");
+        console.log(items);
         if (!this.isLoaded) this.loadFromDisk();
         // add to item history; generate commit
         let commit = {
