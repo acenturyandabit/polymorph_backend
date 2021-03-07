@@ -561,6 +561,7 @@ module.exports = {
                 if (!availList[req.query.f].fileManager) {
                     availList[req.query.f].fileManager = new FileManager(req.query.f, private.baseGitLocation + "/" + req.query.f);
                 }
+                console.log(availList[req.query.f].fileManager.collateForClient());
                 res.send(JSON.stringify(availList[req.query.f].fileManager.collateForClient()));
             } else {
                 //pull from server -- which one? any one, they should be synced
