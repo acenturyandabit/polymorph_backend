@@ -236,6 +236,9 @@ function FileManager(docID, basepath) {
                 if (fs.existsSync(commitHeadPath)) {
                     this.headCommit = JSON.parse(fs.readFileSync(commitHeadPath).toString());
                 }
+                if (fs.existsSync(conflictsPath)) {
+                    this.conflicts = JSON.parse(fs.readFileSync(conflictsPath).toString());
+                }
                 if (fs.existsSync(settingsPath)) {
                     Object.assign(this.settings, JSON.parse(fs.readFileSync(settingsPath)));
                 }
@@ -257,6 +260,23 @@ function FileManager(docID, basepath) {
                 console.log(`err: ${i[0]} not found from hcommit`);
             }
         });
+        return doc;
+    }
+
+    this.collateConflicts = () => {
+        console.log("compiling conflicts...");
+        if (!this.isLoaded) this.loadFromDisk();
+        let doc = {};
+        for (let r in this.conflicts) {
+            doc[r] = {}
+            for (let i in this.conflicts[r]) {
+                if (i == null) {
+                    doc[r][i] = null;
+                } else {
+                    doc[r][i] = this.itemChunks[i][this.conflicts[r][i]];
+                }
+            }
+        }
         return doc;
     }
 
@@ -592,7 +612,7 @@ module.exports = {
                 res.send("{}");
                 return;
             }
-            res.send(JSON.stringify(availList[req.query.f].fileManager.conflicts));
+            res.send(JSON.stringify(availList[req.query.f].fileManager.collateConflicts()));
         });
 
 
