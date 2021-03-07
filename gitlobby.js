@@ -390,7 +390,7 @@ function FileManager(docID, basepath) {
                 this.broadcastToRemotes({
                     op: "fmMessage",
                     type: "commitSend",
-                    data: commit
+                    data: items
                 });
             }
         } else if (this.settings.permissions[source] == "conflict") {
