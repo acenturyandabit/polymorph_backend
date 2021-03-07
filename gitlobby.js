@@ -209,6 +209,8 @@ function FileManager(docID, basepath) {
         defaultPermission: "retrieve"
     };
 
+    this.conflicts = {}; // remote: (itemkey : itemhash)
+
     this.isLoaded = false;
     this.loadFromDisk = () => {
         this.isLoaded = true;
@@ -269,7 +271,7 @@ function FileManager(docID, basepath) {
         })
     }
 
-    this.remotes = [];
+    this.remotes = {};
     /*
     remote: {
         connection
@@ -277,17 +279,19 @@ function FileManager(docID, basepath) {
     }
 
     */
-    this.broadcastToRemotes = (msg) => {
-        this.remotes = this.remotes.filter(i => {
-            if (!i.connected) return false;
-            else {
-                i.write(JSON.stringify(msg));
+    this.broadcastToRemotes = (obj) => {
+        for (let r in this.remotes) {
+            if (!this.remotes[r].connected) {
+                delete this.remotesp[r]
+            } else {
+                this.sendToRemote(r, obj);
             }
-        })
+        }
     }
 
-    this.processClientUpdate = (msg) => {
+    this.processClientUpdate = (msg) => { // realtime update // todo
         switch (msg.type) {
+            /* */
             case "update":
                 // update file history
                 let itmEncodedHash = createEncodedHash(msg.data.id, hash(msg.data.data));
@@ -298,15 +302,6 @@ function FileManager(docID, basepath) {
         this.broadcastToRemotes(msg);
     }
 
-    this.processRemoteUpdate = (msg) => {
-        // check permissions
-        // update file / conflicts
-        // broadcast to all locals
-    }
-
-    this.writeToFile = (category, ID) => {
-
-    }
 
     this.sendToRemote = (id, obj) => {
         obj.docID = this.docID;
@@ -385,8 +380,27 @@ function FileManager(docID, basepath) {
             this.headCommit.timestamp = commit.timestamp;
             this.RTPushChangesLocally(changes);
             fs.writeFileSync(commitHeadPath, JSON.stringify(this.headCommit));
+            if (source == "LOCAL") {
+                this.broadcastToRemotes({
+                    op: "fmMessage",
+                    type: "commitSend",
+                    data: commit
+                });
+            }
         } else if (this.settings.permissions[source] == "conflict") {
-
+            this.conflicts[source] = {};
+            for (let k in commit.items) {
+                if (!this.headCommit.items[k] || this.headCommit.items[k] != commit.items[k]) {
+                    this.conflicts[source][k] = commit.items[k];
+                }
+            }
+            for (let k in this.headCommit.items) {
+                if (!commit.items[k]) {
+                    this.conflicts[source][k] = null; // deletion
+                }
+            }
+            console.log(this.conflicts[source]);
+            fs.writeFileSync(conflictsPath, JSON.stringify(this.conflicts))
         }
         //send the commit to everyone else (todo)
         console.log("processing as commit: ")
@@ -454,6 +468,10 @@ function FileManager(docID, basepath) {
                     this.processItemsAsCommit(data.data);
                 }
                 if (this.remoteCallbacks[remoteID]["pull"]) this.remoteCallbacks[remoteID]["pull"]();
+                break;
+            case "commitSend":
+                // recieve the commit
+                this.processItemsAsCommit(data.data, remoteID);
                 break;
         }
     }
@@ -557,6 +575,18 @@ module.exports = {
             }
         });
 
+        app.get("/gitconflicts", async(req, res) => {
+            console.log("asked for conflicts");
+            if (!availList[req.query.f]) {
+                res.send(JSON.stringify(defaultBaseDocument(req.query.f)));
+                return; // document does not exist, probably bc user added savesource but made no changes and didnt save
+            }
+            if (!availList[req.query.f].fileManager) {
+                res.send("{}");
+                return;
+            }
+            res.send(JSON.stringify(availList[req.query.f].fileManager.conflicts));
+        });
 
 
         let nng = new nanogram(undefined, {
