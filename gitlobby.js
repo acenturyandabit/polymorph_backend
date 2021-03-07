@@ -282,7 +282,7 @@ function FileManager(docID, basepath) {
     this.broadcastToRemotes = (obj) => {
         for (let r in this.remotes) {
             if (!this.remotes[r].connected) {
-                delete this.remotesp[r]
+                delete this.remotes[r]
             } else {
                 this.sendToRemote(r, obj);
             }
