@@ -587,7 +587,7 @@ module.exports = {
                 if (!availList[req.query.f].fileManager) {
                     availList[req.query.f].fileManager = new FileManager(req.query.f, private.baseGitLocation + "/" + req.query.f);
                 }
-                console.log(availList[req.query.f].fileManager.collateForClient());
+                //console.log(availList[req.query.f].fileManager.collateForClient());
                 res.send(JSON.stringify(availList[req.query.f].fileManager.collateForClient()));
             } else {
                 //pull from server -- which one? any one, they should be synced
@@ -597,7 +597,7 @@ module.exports = {
                 //temporary overwrite
                 await availList[req.query.f].fileManager.pullFromRemote();
                 console.log("finished pulling from remote");
-                console.log("final collated was " + JSON.stringify(availList[req.query.f].fileManager.collateForClient()));
+                //console.log("final collated was " + JSON.stringify(availList[req.query.f].fileManager.collateForClient()));
                 res.send(JSON.stringify(availList[req.query.f].fileManager.collateForClient()));
             }
         });
@@ -640,7 +640,7 @@ module.exports = {
             client.TCPsources = {};
             client.connection.on("data", async(data) => {
                 data = prevChunk + data.toString();
-                console.log("nng got " + data);
+                //console.log("nng got " + data);
                 if (!data.includes("\n")) {
                     prevChunk = data;
                     return;
