@@ -336,7 +336,7 @@ function FileManager(docID, basepath) {
     }
     this.checkEnrolItem = (key, item) => {
         let writeHashedItem = (key, h, item) => {
-            this.itemChunks[key][h] = JSON.stringify(item);
+            this.itemChunks[key][h] = item;
             if (!fs.existsSync(itemChunksPath)) {
                 fs.mkdirSync(itemChunksPath, { recursive: true });
             }
@@ -491,7 +491,7 @@ function FileManager(docID, basepath) {
             case "pullSend":
                 //recieve the head
                 if (this.settings.permissions[remoteID] == "overwrite") {
-                    this.processItemsAsCommit(data.data);
+                    this.processItemsAsCommit(data.data, remoteID);
                 }
                 if (this.remoteCallbacks[remoteID]["pull"]) this.remoteCallbacks[remoteID]["pull"]();
                 break;
