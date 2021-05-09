@@ -320,6 +320,7 @@ function FileManager(docID, basepath) {
         switch (data.type) {
             case "sendHead":
                 this.otherCommitCache[remoteID] = data.data;
+                if (!fs.existsSync(remoteCommitsPath + "/" + remoteID)) fs.mkdirSync(remoteCommitsPath + "/" + remoteID, { recursive: true });
                 fs.writeFileSync(remoteCommitsPath + "/" + remoteID + ".json", JSON.stringify(this.otherCommitCache[remoteID]));
                 let itemRequests = [];
                 for (let i of this.otherCommitCache[remoteID].items) {
@@ -461,7 +462,7 @@ module.exports = {
                     try {
                         data = JSON.parse(data.toString());
                     } catch (e) {
-                        console.log(`JSON PARSE FAILED! Chunk: ${data.slice(0,25)}...${data.slice(data.length-25)}`);
+                        console.log(`JSON PARSE FAILED! Chunk: ${data.slice(0, 25)}...${data.slice(data.length - 25)}`);
                     }
                     console.log(data.op, client.id);
                     switch (data.op) {
