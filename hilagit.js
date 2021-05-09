@@ -233,11 +233,11 @@ function FileManager(docID, basepath) {
             }
         }
         let intermediateDoc = this.collateForClient(tmpCache);
-
         //deleted items as well
         for (let i in this.headCommit.items) {
             if (!this.otherCommitCache[remote].items[i]) {
-                intermediateDoc.items[i] = {};
+                intermediateDoc[i] = {};
+                console.log("nerfed " + i);
             }
         }
         return intermediateDoc;
@@ -316,7 +316,6 @@ function FileManager(docID, basepath) {
 
     this.handleRemoteMessage = (data, remoteID) => {
         console.log("got a message fr " + remoteID);
-        console.log(data);
         switch (data.type) {
             case "sendHead":
                 this.otherCommitCache[remoteID] = data.data;
@@ -457,12 +456,14 @@ module.exports = {
                 }
                 prevChunk = "";
                 datae = data.split("\n");
+                prevChunk = datae.pop();
                 for (data of datae) {
                     if (!data.length) continue; // trailing ''s
                     try {
                         data = JSON.parse(data.toString());
                     } catch (e) {
                         console.log(`JSON PARSE FAILED! Chunk: ${data.slice(0, 25)}...${data.slice(data.length - 25)}`);
+                        break;
                     }
                     console.log(data.op, client.id);
                     switch (data.op) {

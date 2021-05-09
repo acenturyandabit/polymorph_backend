@@ -657,6 +657,7 @@ module.exports = {
                 }
                 prevChunk = "";
                 datae = data.split("\n");
+                prevChunk = datae.pop();
                 for (data of datae) {
                     if (!data.length) continue; // trailing ''s
                     try {
