@@ -307,7 +307,6 @@ function FileManager(docID, basepath) {
 
     this.attachRemote = (connection, ID, soft) => {
         this.remotes[ID] = connection;
-        if (!this.remoteCallbacks[ID]) this.remoteCallbacks[ID] = {};
         if (!soft) {
             // check settings of the remote and initiate a pull if we want
             if (!this.settings.permissions[ID]) this.settings.permissions[ID] = "conflict"; // for now
