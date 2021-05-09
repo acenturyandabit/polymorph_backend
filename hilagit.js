@@ -323,7 +323,7 @@ function FileManager(docID, basepath) {
                 if (!fs.existsSync(remoteCommitsPath + "/" + remoteID)) fs.mkdirSync(remoteCommitsPath + "/" + remoteID, { recursive: true });
                 fs.writeFileSync(remoteCommitsPath + "/" + remoteID + ".json", JSON.stringify(this.otherCommitCache[remoteID]));
                 let itemRequests = [];
-                for (let i of this.otherCommitCache[remoteID].items) {
+                for (let i in this.otherCommitCache[remoteID].items) {
                     if (!this.itemChunks[i][this.otherCommitCache[remoteID].items[i]]) {
                         itemRequests.push([i, this.otherCommitCache[remoteID].items[i]]);
                     }
