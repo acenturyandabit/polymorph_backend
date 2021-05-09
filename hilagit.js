@@ -109,6 +109,7 @@ let fileNameSafeEscape = {
 }
 
 function FileManager(docID, basepath) {
+    console.log("init with docID " + docID);
     this.docID = docID;
     this.basepath = basepath;
 
