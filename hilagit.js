@@ -175,6 +175,40 @@ function FileManager(docID, basepath) {
         return doc;
     }
 
+    this.processItemsAsCommit = (items, source) => {
+        console.log("processing commit");
+        // add to item history; generate commit
+        let commit = {
+            source: source,
+            timestamp: Date.now(),
+            items: {}
+        };
+        for (let i in items) {
+            commit.items[i] = this.checkEnrolItem(i, items[i]);
+        }
+        let changes = [];
+        for (let k in commit.items) {
+            if (!this.headCommit.items[k] || this.headCommit.items[k] != commit.items[k]) {
+                this.headCommit.items[k] = commit.items[k];
+                changes.push(k);
+            }
+        }
+        for (let k in this.headCommit.items) {
+            if (!commit.items[k]) {
+                delete this.headCommit.items[k];
+                changes.push(k);
+            }
+        }
+        this.headCommit.timestamp = commit.timestamp;
+        fs.writeFileSync(commitHeadPath, JSON.stringify(this.headCommit));
+        console.log("broadcasting to remotes: ");
+        this.broadcastToRemotes({
+            op: "fmMessage",
+            type: "sendHead",
+            data: this.headCommit
+        });
+    }
+
     this.collateConflicts = (remote) => {
         console.log("compiling conflicts...");
         if (!this.otherCommitCache[remote]) {
@@ -433,7 +467,7 @@ module.exports = {
                                 availList[data.docID] = {
                                     type: "remote",
                                     hostID: client.id,
-                                    fileManager = new FileManager(data.docID, private.baseGitLocation + "/" + data.docID)
+                                    fileManager: new FileManager(data.docID, private.baseGitLocation + "/" + data.docID)
                                 }
                             }
                             // since we only enrol other's remotes, gotta enrol on our side too
