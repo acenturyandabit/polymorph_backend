@@ -1,0 +1,18 @@
+1. connect A and B polymorph backends
+2. open A polymorph frontend; open diffs pane; should see diffs against B. 
+3. make changes on A frontend; in real time, should see diffs in B against A update.
+4. be able to merge B changes into A using button on A.
+
+on connect, share head with all connected
+on client change head, share head with all connected
+
+on get head
+    - update head of remote
+    - check if items in head exist. If no, request items
+
+client:
+- fetch current fulldoc
+- push current fulldoc
+- fetch others' diffs 
+- [push live updates]
+- [realtime recieve updates to diffs] 

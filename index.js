@@ -40,6 +40,6 @@ if (private.lobbyFileLocation) { // dont want this on the linode
 }
 
 if (private.baseGitLocation) { // dont want this on the linode
-    var lobby = require("./gitlobby");
-    lobby.prepare(app, private);
+    var glob = require("./hilagit");
+    glob.prepare(app, private);
 }

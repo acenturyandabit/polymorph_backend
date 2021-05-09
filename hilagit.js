@@ -1,68 +1,3 @@
-/*
-constraint 1: SAVES ARE UNIDIRECTIONAL
-constraint 2: as lightweight as possible on clients
-Trust isn't necessary if both parties can rollback indefinitely
-- commit level and file level rollbacks
-- trust levels: ignore, retrieve, auto-merge, realtime, realtime override. Configurable per document per peer per backend instance; confs stored server-side.
-- if >retrieve: on connect / save broadcast, get all changes and put in conflicts
-- if >auto-merge: on connect / save broadcast, perform automerge
-- if >realtime: while not conflict, overwrite changes to items
-- if realtime override: always overwrite changes to items from realtime (save broadcast behaviour remains the same)
-conflicts: 
-- for each peer, for each item, store conflicts on backend and pass to frontend. 
-- instantly merge rts to conflict storage, then push to client.
-- front end menu to fix conflicts + roll back to old version
-realtime:
-- if RT on client is on: all parties do independent processing (because what if 3 clients?)
-- if RT on client is off: all parties do independent processing
-- if RT on client goes from off to on: assume doc is the same...
-- if save an older version of the doc: ??? 
-    - hashes are not stored with items; use git-like commit level and file level
-    - hashes are stored with items, keep newer item?
-    -- key being, if any client saves, we should be able to retrieve that save based on a commit id
-    -- also never want the user to deal with any commit-level clashes
-    - server keeps all ctrl s as a commit. 
-    -- but what about individual versions? Do they count as commits?
-    --- keep a floating "HEAD" commit that is the latest; and then each user ctrl-s / remote ctrl-s is the latest.
-    --- but phone gitlite will count everything as a ctrl-s!
-    ---- make commits light enough for that not to matter; collate commits by user
-file ID: itemID + hash of item + date so that rollbacks can differentiate a rollback
-    - stored as b64 encoded version
-file pointer: keeps track of all versions of files in this local line.
-
-later:
-commit ID: newcommitID + lastcommitID (locally) to assist with own iteration. Scope of commit is purely local.
-- commits are only used for rollback purposes.
-
-task on clients:
-- host will tell whether the update is a conflict or an overwrite based on settings
-- onus on user to regularly save when changes are made [hit autosave if want]
-- just render.
--- doesnt that mean we can just use the server? 
--- but gitlite conflicts on client..
-- gitline conflicts on client: client can resolve them. 
--- when client resolves conflicts, save the /conflicts:
--- what if two clients both resolve conflicts and neither are realtime? then last one wins. the issue is between host and host.
-- conflicts is under _conflicts and is a special item that git reads.
-- dict of itemID then remote_host_ID
-phone needs to defer to changes somehow: make phone defer by default, but also have rollback capability for phone anyway
-
-storage:
-with data:
-- conflicts
-- data
-without data:
-- permissions (editable)
-- file history (retrieved during rollbacks)
-- commit history (retrieved during rollbacks)
-- file hashes (retrieved during rollbacks)
-
-Diagram:
-https://app.diagrams.net/#G1vneiuzlwwIAqeFWXKr2LFH7fCh8en68g
-*/
-
-
-let path = require("path");
 let fs = require("fs");
 let nanogram = require("./nanogram");
 let pmDataUtils = require("./polymorph_dataUtils");
@@ -71,11 +6,6 @@ let http = require('http');
 
 let polymorph_core = {};
 pmDataUtils.addDataUtils(polymorph_core);
-/*
-Tests
-- load from remote
-- sync two sided
-*/
 
 let hash = (str) => {
     var hash = 0;
@@ -88,14 +18,6 @@ let hash = (str) => {
         hash = hash & hash; // Convert to 32bit integer
     }
     return hash;
-}
-
-let createEncodedHash = (itmid, hash, date = Date.now()) => {
-    return Buffer.from(JSON.stringify({ i: itmid, h: hash, d: date })).toString('base64');
-}
-
-let fromEncodedHash = (hash) => {
-    return JSON.parse(Buffer.from(hash, 'base64').toString());
 }
 
 function defaultBaseDocument(id) {
@@ -191,25 +113,8 @@ function FileManager(docID, basepath) {
     this.basepath = basepath;
 
     let itemChunksPath = `${basepath}/ichnk`; // will this need rewrites: no never
-    let commitHistoryPath = `${basepath}/chist.json`; // will this need rewrites: no never
     let commitHeadPath = `${basepath}/chead.json`; //will this need rewrites: yes, frequently
-    let settingsPath = `${basepath}/settings.json`; // will this need rewrites: yes, frequently
-    let conflictsPath = `${basepath}/conflicts.json`; // will this need rewrites: yes, frequently
-
-    this.headCommit = {
-        items: {},
-        timestamp: 0
-    };
-    this.itemChunks = {};
-    this.commitHistory = {};
-    this.remoteCommitWaiters = {};
-    this.remoteCallbacks = {};
-    this.settings = {
-        permissions: {},
-        defaultPermission: "retrieve"
-    };
-
-    this.conflicts = {}; // remote: (itemkey : itemhash)
+    let remoteCommitsPath = `${basepath}/rcomm`; //will this need rewrites: yes, frequently
 
     this.isLoaded = false;
     this.loadFromDisk = () => {
@@ -226,21 +131,9 @@ function FileManager(docID, basepath) {
                     }, {});
                     this.itemChunks[fileNameSafeEscape.decodeFileName(i.slice(0, i.length - 5))] = itemDict;
                 });
-                /*files = fs.readdirSync(commitHistoryPath);
-                files.filter(i => i.endsWith(".json")).forEach(i => {
-                    this.commitHistory[i.slice(0, i.length - 5)] = JSON.parse((fs.readFileSync(commitHistoryPath + "/" + i)).toString());
-                });*/
-                //TODO: last saved commit should be the thing that no-one points to - iterate over commit history to find it
-
                 //todo: each item to a file is slightly more efficient
                 if (fs.existsSync(commitHeadPath)) {
                     this.headCommit = JSON.parse(fs.readFileSync(commitHeadPath).toString());
-                }
-                if (fs.existsSync(conflictsPath)) {
-                    this.conflicts = JSON.parse(fs.readFileSync(conflictsPath).toString());
-                }
-                if (fs.existsSync(settingsPath)) {
-                    Object.assign(this.settings, JSON.parse(fs.readFileSync(settingsPath)));
                 }
             } catch (e) {
                 console.log(e);
@@ -248,10 +141,29 @@ function FileManager(docID, basepath) {
         }
     }
 
+    let self = this;
+    this._headCommit = {
+        items: {},
+        timestamp: 0
+    };
+    this.headCommit = new Proxy(this._headCommit, {
+        get: function() {
+            if (!self.isLoaded) self.loadFromDisk();
+            return Reflect.get(...arguments);
+        }
+    })
+    this._itemChunks = {};
+    this.otherCommitCache = {};
+    this.itemChunks = new Proxy(this._itemChunks, {
+        get: function() {
+            if (!self.isLoaded) self.loadFromDisk();
+            return Reflect.get(...arguments);
+        }
+    })
 
-    this.collateForClient = () => {
+    this.collateForClient = (commit) => {
+        if (!commit) commit = this.headCommit;
         console.log("compiling...");
-        if (!this.isLoaded) this.loadFromDisk();
         let doc = {};
         Object.entries(this.headCommit.items).forEach(i => {
             if (this.itemChunks[i[0]]) {
@@ -263,68 +175,48 @@ function FileManager(docID, basepath) {
         return doc;
     }
 
-    this.collateConflicts = () => {
+    this.collateConflicts = (remote) => {
         console.log("compiling conflicts...");
-        if (!this.isLoaded) this.loadFromDisk();
-        let doc = {};
-        for (let r in this.conflicts) {
-            doc[r] = {}
-            for (let i in this.conflicts[r]) {
-                if (i == null) {
-                    doc[r][i] = null;
-                } else {
-                    doc[r][i] = this.itemChunks[i][this.conflicts[r][i]];
-                }
+        if (!this.otherCommitCache[remote]) {
+            if (fs.existsSync(basepath + "/" + remote + ".json")) {
+                this.otherCommitCache[remote] = JSON.parse(fs.readFileSync(basepath + "/" + remote + ".json"));
+            } else {
+                this.otherCommitCache[remote] = { items: {} }
             }
         }
-        return doc;
-    }
-
-    this.clients = [];
-
-    this.broadcastToClients = (msg) => {
-        this.clients = this.clients.filter(i => {
-            if (!i.connected) return false;
-            else {
-                i.send(JSON.stringify(msg));
+        let tmpCache = { items: {} };
+        for (let i in this.otherCommitCache[remote].items) {
+            if (this.otherCommitCache[remote].items[i] != this.headCommit.items[i]) {
+                tmpCache.items[i] = this.otherCommitCache[remote].items[i];
             }
-        })
+        }
+        let intermediateDoc = this.collateForClient(tmpCache);
+
+        //deleted items as well
+        for (let i in this.headCommit.items) {
+            if (!this.otherCommitCache[remote].items[i]) {
+                intermediateDoc.items[i] = {};
+            }
+        }
+        return intermediateDoc;
     }
 
-    this.remotes = {};
     /*
-    remote: {
-        connection
-        id --> maps to settings.permissions[id]
-    }
-
+    remote: dict of id to connection
     */
+    this.remotes = {};
+
     this.broadcastToRemotes = (obj) => {
         for (let r in this.remotes) {
-            console.log(this.remotes[r]);
             try {
-                console.log("sent to " + r);
                 this.sendToRemote(r, obj);
+                console.log("sent to " + r);
             } catch (e) {
                 console.log(e);
-                delete this.remotes[r]
+                delete this.remotes[r];
             }
         }
     }
-
-    this.processClientUpdate = (msg) => { // realtime update // todo
-        switch (msg.type) {
-            /* */
-            case "update":
-                // update file history
-                let itmEncodedHash = createEncodedHash(msg.data.id, hash(msg.data.data));
-                this.itemChunks[msg.data.id].unshift(itmEncodedHash);
-                // what about deletions? commits can unlink items and they no longer exist but they exist in older commits. beautiful
-                // but item history is permanent... oh no i guess we can flag items as dead? later thing
-        }
-        this.broadcastToRemotes(msg);
-    }
-
 
     this.sendToRemote = (id, obj) => {
         obj.docID = this.docID;
@@ -334,7 +226,6 @@ function FileManager(docID, basepath) {
             console.log(`remote ${id} did not exist!`);
         }
     }
-
 
     /*
     Checks if the item with id `id` has a version `item` in storage, and enrols it if not.
@@ -373,85 +264,6 @@ function FileManager(docID, basepath) {
         return ihash;
     }
 
-    this.RTPushChangesLocally = (keys) => {
-
-    }
-
-    /*
-    Given a dictionary of items and a source (local or otherwise), decides what to do. Can:
-        - Overwrite the headcommit;
-        - regenerate conflicts but do nothing to the headcommit
-    */
-    this.processItemsAsCommit = (items, source) => {
-        console.log("processing commit, items was");
-        console.log(items);
-        if (!this.isLoaded) this.loadFromDisk();
-        // add to item history; generate commit
-        let commit = {
-            source: source,
-            timestamp: Date.now(),
-            items: {}
-        };
-        for (let i in items) {
-            commit.items[i] = this.checkEnrolItem(i, items[i]);
-        }
-        //TODO: Write commit to file (append) this.commitHistory[i.slice(0, i.length - 5)] = JSON.parse((fs.readFileSync(commitHistoryPath + "/" + i)).toString());
-
-        //update head if necessary
-        if (source == "LOCAL" || this.settings.permissions[source] == "overwrite") {
-            let changes = [];
-            for (let k in commit.items) {
-                if (!this.headCommit.items[k] || this.headCommit.items[k] != commit.items[k]) {
-                    this.headCommit.items[k] = commit.items[k];
-                    changes.push(k);
-                }
-            }
-            for (let k in this.headCommit.items) {
-                if (!commit.items[k]) {
-                    delete this.headCommit.items[k];
-                    changes.push(k);
-                }
-            }
-            this.headCommit.timestamp = commit.timestamp;
-            this.RTPushChangesLocally(changes);
-            fs.writeFileSync(commitHeadPath, JSON.stringify(this.headCommit));
-            if (source == "LOCAL") {
-                console.log("broadcasting to remotes: ");
-                this.broadcastToRemotes({
-                    op: "fmMessage",
-                    type: "commitSend",
-                    data: items
-                });
-            }
-        } else if (this.settings.permissions[source] == "conflict") {
-            this.conflicts[source] = {};
-            for (let k in commit.items) {
-                if (!this.headCommit.items[k] || this.headCommit.items[k] != commit.items[k]) {
-                    this.conflicts[source][k] = commit.items[k];
-                }
-            }
-            for (let k in this.headCommit.items) {
-                if (!commit.items[k]) {
-                    this.conflicts[source][k] = null; // deletion
-                }
-            }
-            console.log(this.conflicts[source]);
-            fs.writeFileSync(conflictsPath, JSON.stringify(this.conflicts))
-        }
-        //send the commit to everyone else (todo)
-        console.log("processing as commit: ");
-        console.log(this.headCommit);
-        // write the head commit
-        fs.writeFileSync(commitHeadPath, JSON.stringify(this.headCommit));
-    }
-
-    this.attachClient = (client) => {
-        this.clients.push(client);
-        client.on("message", (data) => {
-            this.processClientUpdate(JSON.parse(data.utf8Data));
-        })
-    }
-
     this.attachRemote = (connection, ID, soft) => {
         this.remotes[ID] = connection;
         if (!this.remoteCallbacks[ID]) this.remoteCallbacks[ID] = {};
@@ -460,7 +272,7 @@ function FileManager(docID, basepath) {
             if (!this.settings.permissions[ID]) this.settings.permissions[ID] = "conflict"; // for now
             if (this.settings.permissions[ID] == "overwrite" || this.settings.permissions[ID] == "conflict") {
                 //pull changes. what does pull changes mean? 
-                this.sendToRemote(ID, { op: "fmMessage", type: "pull" });
+                this.sendToRemote(ID, { op: "fmMessage", type: "sendHead", data: this.headCommit });
             }
         }
     }
@@ -469,81 +281,36 @@ function FileManager(docID, basepath) {
         console.log("got a message fr " + remoteID);
         console.log(data);
         switch (data.type) {
-            case "fetchHeadCommit":
-                //send over my head
-                if (!this.isLoaded) this.loadFromDisk();
-                console.log(this.headCommit);
+            case "sendHead":
+                this.otherCommitCache[remoteID] = data.data;
+                fs.writeFileSync(remoteCommitsPath + "/" + remoteID + ".json", JSON.stringify(this.otherCommitCache[remoteID]));
+                let itemRequests = [];
+                for (let i of this.otherCommitCache[remoteID].items) {
+                    if (!this.itemChunks[i][this.otherCommitCache[remoteID].items[i]]) {
+                        itemRequests.push([i, this.otherCommitCache[remoteID].items[i]]);
+                    }
+                }
+                this.sendToRemote(remoteID, { op: "fmMessage", type: "requestItems", data: itemRequests });
+                break;
+            case "requestItems":
+                //send over the desired items
                 this.sendToRemote(remoteID, {
                     op: "fmMessage",
-                    type: "headCommitSend",
-                    data: this.headCommit
-                }); // more efficient way of doing this is possible but eh for now.
-                console.log("sent headcommit to " + remoteID);
+                    type: "recieveItems",
+                    data: data.data.map(i => [i[0], i[1], this.itemChunks[i[0]][i[1]]])
+                });
                 break;
-            case "headCommitSend":
-                //recieve the head
-                if (this.remoteCommitWaiters[remoteID]) {
-                    data.data.remote = remoteID;
-                    console.log("got headcommit fr " + remoteID);
-                    this.remoteCommitWaiters[remoteID](data.data);
-                    delete this.remoteCommitWaiters[remoteID];
-                }
-                break;
-            case "pull":
-                //send over my head
-                console.log("here are my thingies");
-                this.sendToRemote(remoteID, {
-                    op: "fmMessage",
-                    type: "pullSend",
-                    data: this.collateForClient()
-                }); // more efficient way of doing this is possible but eh for now.
-                break;
-            case "pullSend":
-                //recieve the head
-                if (this.settings.permissions[remoteID] == "overwrite") {
-                    this.processItemsAsCommit(data.data, remoteID);
-                }
-                if (this.remoteCallbacks[remoteID]["pull"]) this.remoteCallbacks[remoteID]["pull"]();
-                break;
-            case "commitSend":
-                // recieve the commit
-                this.processItemsAsCommit(data.data, remoteID);
+            case "recieveItems":
+                data.data.forEach(i => {
+                    this.itemChunks[i[0]][i[1]] = i[2];
+                })
                 break;
         }
     }
-    this.remoteCommitWaiters = {};
-    this.pullFromRemote = async() => {
-        console.log("pulling from remote...");
-        // pull all overwrite-class heads and use the latest one (store it for retrieval from collate)
-        let remotesToPullFrom = [];
-        remotesToPullFrom = Object.entries(this.settings.permissions).filter(i => i[1] == "overwrite").map(i => i[0]);
-        if (!remotesToPullFrom.length) {
-            remotesToPullFrom = Object.entries(this.settings.permissions).filter(i => i[1] == "conflict").map(i => i[0]);
-        }
-        if (remotesToPullFrom.length) {
-            let mostRecents = remotesToPullFrom.map(i => new Promise((res) => {
-                this.remoteCommitWaiters[i] = res;
-                this.sendToRemote(i, { op: "fmMessage", type: "fetchHeadCommit" });
-                console.log("sent fetchhead to " + i);
-                setTimeout(() => { res({ timestamp: -1, remote: i }) }, 10000); // 10s timeout
-            }));
-            mostRecents = await Promise.all(mostRecents);
-            console.log("yay i got the commits");
-            console.log(mostRecents);
-            mostRecents.sort((a, b) => a.timestamp - b.timestamp);
-            console.log("pulling from " + mostRecents[0]);
-            console.log("pulling from " + mostRecents[0].remote);
-            this.headCommit = mostRecents[0];
-            let oldPermission = this.settings.permissions[mostRecents[0].remote]; // if pulling from a conflict source, temporarily allow overwrites so we actually get items
-            this.settings.permissions[mostRecents[0].remote] = "overwrite";
-            await new Promise((res) => {
-                this.remoteCallbacks[mostRecents[0].remote]["pull"] = res;
-                this.sendToRemote(mostRecents[0].remote, { op: "fmMessage", type: "pull" });
-            });
-            this.settings.permissions[mostRecents[0].remote] = oldPermission;
-        }
+    this.pullFromRemote = (remoteID) => {
+        if (!remoteID) remoteID = Object.keys(this.otherCommitCache)[0];
+        this.headCommit = JSON.parse(JSON.stringify(this.otherCommitCache[remoteID]));
     }
-
 }
 
 
@@ -636,18 +403,13 @@ module.exports = {
 
         let prepareClient = (client) => {
             console.log("glite preparing " + client.id);
-            client.connection.write(JSON.stringify({
-                op: "pushAvailList",
-                list: Object.values(availList).filter(i => i.type == "local").map(i => {
-                    let u = JSON.parse(JSON.stringify(i));
-                    delete u.fileManager;
-                    return u;
-                }),
-                RTList: Object.keys(RTmanagers)
-            }) + "\n");
             onlineClients[client.id] = client;
+
+            for (let i in availList) {
+                // get all my files to send pushes to remotes
+                availList.fileManager.attachRemote(client.connection, client.id);
+            }
             let prevChunk = "";
-            client.TCPsources = {};
             client.connection.on("data", async(data) => {
                 data = prevChunk + data.toString();
                 //console.log("nng got " + data);
@@ -662,41 +424,21 @@ module.exports = {
                     try {
                         data = JSON.parse(data.toString());
                     } catch (e) {
-                        console.log(e);
-                        console.log(data);
+                        console.log(`JSON PARSE FAILED! Chunk: ${data.slice(0,25)}...${data.slice(data.length-25)}`);
                     }
                     console.log(data.op, client.id);
                     switch (data.op) {
-                        case "pushAvailList":
-                            let remoteList = data.list;
-                            remoteList = remoteList.map(i => {
-                                i.type = "remote";
-                                i.hostID = client.id;
-                                return i;
-                            });
-                            for (let i of remoteList) {
-                                if (!availList[i.id]) {
-                                    availList[i.id] = i;
-                                }
-                                if (!availList[i.id].fileManager) {
-                                    availList[i.id].fileManager = new FileManager(i.id, private.baseGitLocation + "/" + i.id);
-                                }
-                                availList[i.id].fileManager.attachRemote(client.connection, client.id); // it is responsible for the pull, and setting up listener websockets and whatnot
-                            }
-                            break;
                         case "fmMessage":
-                            // since we only enrol other's remotes, gotta enrol on our side too
-                            availList[data.docID].fileManager.attachRemote(client.connection, client.id, true);
                             if (!availList[data.docID]) {
                                 availList[data.docID] = {
                                     type: "remote",
-                                    hostID: client.id
-                                };
+                                    hostID: client.id,
+                                    fileManager = new FileManager(data.docID, private.baseGitLocation + "/" + data.docID)
+                                }
                             }
-                            if (!availList[data.docID].fileManager) {
-                                availList[data.docID].fileManager = new FileManager(data.docID, private.baseGitLocation + "/" + data.docID);
-                                availList[data.docID].fileManager.attachRemote(client.connection, client.id);
-                            }
+                            // since we only enrol other's remotes, gotta enrol on our side too
+                            // don't need to send message over since should have done that earlier
+                            availList[data.docID].fileManager.attachRemote(client.connection, client.id, true);
                             availList[data.docID].fileManager.handleRemoteMessage(data, client.id);
                             break;
                     }
