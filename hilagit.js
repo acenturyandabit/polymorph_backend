@@ -309,11 +309,7 @@ function FileManager(docID, basepath) {
         this.remotes[ID] = connection;
         if (!soft) {
             // check settings of the remote and initiate a pull if we want
-            if (!this.settings.permissions[ID]) this.settings.permissions[ID] = "conflict"; // for now
-            if (this.settings.permissions[ID] == "overwrite" || this.settings.permissions[ID] == "conflict") {
-                //pull changes. what does pull changes mean? 
-                this.sendToRemote(ID, { op: "fmMessage", type: "sendHead", data: this.headCommit });
-            }
+            this.sendToRemote(ID, { op: "fmMessage", type: "sendHead", data: this.headCommit });
         }
     }
 
