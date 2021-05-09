@@ -210,6 +210,13 @@ function FileManager(docID, basepath) {
     }
 
     this.collateConflicts = (remote) => {
+        if (!remote) {
+            let result = {};
+            for (let i in this.otherCommitCache) {
+                result[i] = this.collateConflicts(i);
+            }
+            return result;
+        }
         console.log("compiling conflicts...");
         if (!this.otherCommitCache[remote]) {
             if (fs.existsSync(basepath + "/" + remote + ".json")) {
@@ -441,7 +448,7 @@ module.exports = {
 
             for (let i in availList) {
                 // get all my files to send pushes to remotes
-                availList.fileManager.attachRemote(client.connection, client.id);
+                availList[i].fileManager.attachRemote(client.connection, client.id);
             }
             let prevChunk = "";
             client.connection.on("data", async(data) => {
