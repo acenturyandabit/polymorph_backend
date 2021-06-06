@@ -93,7 +93,7 @@ module.exports = function nanogram(id, _options) {
     };
 
     //create a udp port
-    const server = dgram.createSocket('udp4');
+    const server = dgram.createSocket({ type: 'udp4', reuseAddr: true });
     server.bind(options.udpPort, undefined, () => {
         server.setBroadcast(true);
     })

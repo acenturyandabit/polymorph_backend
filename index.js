@@ -34,12 +34,12 @@ if (private.imageFileLocation) { // dont want this on the linode
     imageServer.prepare(app, private);
 }
 
-if (private.lobbyFileLocation) { // dont want this on the linode
+if (private.lobbyFileLocation) {
     var lobby = require("./lobby");
     lobby.prepare(app, private);
 }
 
-if (private.baseGitLocation) { // dont want this on the linode
+if (private.baseGitLocation) {
     var glob = require("./hilagit");
     glob.prepare(app, private);
 }

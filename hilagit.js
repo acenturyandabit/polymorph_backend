@@ -1,11 +1,33 @@
+/*
+Item keys
+    - Universal scope
+Doc ID
+    - Universal scope
+Doc Time
+    - Doc ID scope
+Self ID
+    - Universal scope
+Item hash
+    - Item key scope
+*/
+
 let fs = require("fs");
 let nanogram = require("./nanogram");
 let pmDataUtils = require("./polymorph_dataUtils");
 let WebSocketServer = require('websocket').server;
 let http = require('http');
 
+
 let polymorph_core = {};
 pmDataUtils.addDataUtils(polymorph_core);
+
+let thisServerIdentifier;
+if (fs.existsSync("thisServerIdentifier")) {
+    thisServerIdentifier = String(fs.readFileSync("thisServerIdentifier"));
+} else {
+    thisServerIdentifier = String(Date.now());
+    fs.writeFileSync("thisServerIdentifier", thisServerIdentifier);
+}
 
 let hash = (str) => {
     var hash = 0;
@@ -109,168 +131,92 @@ let fileNameSafeEscape = {
 }
 
 function FileManager(docID, basepath) {
-    console.log("init with docID " + docID);
     this.docID = docID;
     this.basepath = basepath;
 
-    let itemChunksPath = `${basepath}/ichnk`; // will this need rewrites: no never
-    let commitHeadPath = `${basepath}/chead.json`; //will this need rewrites: yes, frequently
-    let remoteCommitsPath = `${basepath}/rcomm`; //will this need rewrites: yes, frequently
+    let commitsPath = `${basepath}/commits`; // commits
+    /*
+    /commits
+        /<remoteID>
+            /chead.json
+            /hhead
+                /<date>.json
+    */
+    this._commitsByServer = {};
+    this.commitsByServer = new Proxy(this._commitsByServer, {
+        get: function(target, remoteID) {
+            if (!target[remoteID]) {
+                if (!fs.existsSync(commitsPath)) {
+                    fs.mkdirSync(commitsPath);
+                }
+                let folderPath = `${commitsPath}/${fileNameSafeEscape.encodeFileName(remoteID)}`;
+                let tmpStorage = {};
+                if (fs.existsSync(folderPath)) {
+                    if (fs.existsSync(folderPath)) {
+                        for (let commit in fs.readdirSync(folderPath)) {
+                            if (commit.endsWith(".json")) {
+                                tmpStorage[remoteID][commit.slice(0, commit.length - 5)] = JSON.parse(fs.readFileSync(`${folderPath}/${commit}.json`).toString());
+                            }
+                        };
+                    }
+                } else {
+                    fs.mkdirSync(folderPath);
+                }
+                target[remoteID] = {
+                    commits: tmpStorage,
+                    latestCommit: () => {
+                        let keys = Object.keys(tmpStorage);
+                        keys.sort((a, b) => b - a);
+                        if (!keys.length) return {};
+                        return tmpStorage[keys[0]];
+                    },
+                    enrolCommit: (commit) => {
+                        //add it to tmpstorage
+                        tmpStorage[commit.timestamp] = commit;
+                        // write it to file
+                        fs.writeFileSync(`${folderPath}/${commit.timestamp}.json`, JSON.stringify(commit));
+                    }
+                }
+            }
+            return target[remoteID];
+        }
+    })
+    Object.defineProperty(this, "localhead", {
+        get: () => {
+            return this.commitsByServer[thisServerIdentifier];
+        }
+    })
 
-    this.isLoaded = false;
-    this.loadFromDisk = () => {
-        this.isLoaded = true;
-        // load itemchunks + head items from file
-        if (fs.existsSync(basepath)) {
-            try {
-                let files = fs.readdirSync(itemChunksPath);
-                files.filter(i => i.endsWith(".json")).forEach(i => {
-                    let itemArray = fs.readFileSync(itemChunksPath + "/" + i).toString().split("\n").filter(i => i.length);
-                    let itemDict = itemArray.map(i => JSON.parse(i)).reduce((p, i) => {
+    let itemChunksPath = `${basepath}/ichnk`; // will this need rewrites: no never
+    /*
+    /ichnk
+        /<itemID>.json
+            \n {
+                h: string
+                i: {}
+    */
+    this._itemChunks = {};
+    this.itemChunks = new Proxy(this._itemChunks, {
+        get: function(target, itemID) {
+            if (!target[itemID]) {
+                let filePath = `${itemChunksPath}/${fileNameSafeEscape.encodeFileName(itemID)}.json`;
+                if (fs.existsSync(filePath)) {
+                    // read all the hashes
+                    let itemArray = fs.readFileSync(filePath).toString().split("\n").filter(i => i.length);
+                    target[itemID] = itemArray.map(i => JSON.parse(i)).reduce((p, i) => {
                         p[i.h] = i.i;
                         return p;
                     }, {});
-                    this.itemChunks[fileNameSafeEscape.decodeFileName(i.slice(0, i.length - 5))] = itemDict;
-                });
-                //todo: each item to a file is slightly more efficient
-                if (fs.existsSync(commitHeadPath)) {
-                    this.headCommit = JSON.parse(fs.readFileSync(commitHeadPath).toString());
+                } else {
+                    target[itemID] = {};
                 }
-            } catch (e) {
-                console.log(e);
             }
-        }
-    }
-
-    let self = this;
-    this._headCommit = {
-        items: {},
-        timestamp: 0
-    };
-    this.headCommit = new Proxy(this._headCommit, {
-        get: function() {
-            if (!self.isLoaded) self.loadFromDisk();
-            return Reflect.get(...arguments);
-        }
-    })
-    this._itemChunks = {};
-    this.otherCommitCache = {};
-    this.itemChunks = new Proxy(this._itemChunks, {
-        get: function() {
-            if (!self.isLoaded) self.loadFromDisk();
-            return Reflect.get(...arguments);
+            return target[itemID];
         }
     })
 
-    this.collateForClient = (commit) => {
-        if (!commit) commit = this.headCommit;
-        console.log("compiling...");
-        let doc = {};
-        Object.entries(this.headCommit.items).forEach(i => {
-            if (this.itemChunks[i[0]]) {
-                doc[i[0]] = this.itemChunks[i[0]][i[1]];
-            } else {
-                console.log(`err: ${i[0]} not found from hcommit`);
-            }
-        });
-        return doc;
-    }
-
-    this.processItemsAsCommit = (items, source) => {
-        console.log("processing commit");
-        // add to item history; generate commit
-        let commit = {
-            source: source,
-            timestamp: Date.now(),
-            items: {}
-        };
-        for (let i in items) {
-            commit.items[i] = this.checkEnrolItem(i, items[i]);
-        }
-        let changes = [];
-        for (let k in commit.items) {
-            if (!this.headCommit.items[k] || this.headCommit.items[k] != commit.items[k]) {
-                this.headCommit.items[k] = commit.items[k];
-                changes.push(k);
-            }
-        }
-        for (let k in this.headCommit.items) {
-            if (!commit.items[k]) {
-                delete this.headCommit.items[k];
-                changes.push(k);
-            }
-        }
-        this.headCommit.timestamp = commit.timestamp;
-        fs.writeFileSync(commitHeadPath, JSON.stringify(this.headCommit));
-        console.log("broadcasting to remotes: ");
-        this.broadcastToRemotes({
-            op: "fmMessage",
-            type: "sendHead",
-            data: this.headCommit
-        });
-    }
-
-    this.collateConflicts = (remote) => {
-        if (!remote) {
-            let result = {};
-            for (let i in this.otherCommitCache) {
-                result[i] = this.collateConflicts(i);
-            }
-            return result;
-        }
-        console.log("compiling conflicts...");
-        if (!this.otherCommitCache[remote]) {
-            if (fs.existsSync(basepath + "/" + remote + ".json")) {
-                this.otherCommitCache[remote] = JSON.parse(fs.readFileSync(basepath + "/" + remote + ".json"));
-            } else {
-                this.otherCommitCache[remote] = { items: {} }
-            }
-        }
-        let tmpCache = { items: {} };
-        for (let i in this.otherCommitCache[remote].items) {
-            if (this.otherCommitCache[remote].items[i] != this.headCommit.items[i]) {
-                tmpCache.items[i] = this.otherCommitCache[remote].items[i];
-            }
-        }
-        let intermediateDoc = this.collateForClient(tmpCache);
-        //deleted items as well
-        for (let i in this.headCommit.items) {
-            if (!this.otherCommitCache[remote].items[i]) {
-                intermediateDoc[i] = {};
-                console.log("nerfed " + i);
-            }
-        }
-        return intermediateDoc;
-    }
-
     /*
-    remote: dict of id to connection
-    */
-    this.remotes = {};
-
-    this.broadcastToRemotes = (obj) => {
-        for (let r in this.remotes) {
-            try {
-                this.sendToRemote(r, obj);
-                console.log("sent to " + r);
-            } catch (e) {
-                console.log(e);
-                delete this.remotes[r];
-            }
-        }
-    }
-
-    this.sendToRemote = (id, obj) => {
-        obj.docID = this.docID;
-        if (this.remotes[id]) {
-            this.remotes[id].write(JSON.stringify(obj) + "\n");
-        } else {
-            console.log(`remote ${id} did not exist!`);
-        }
-    }
-
-    /*
-    Checks if the item with id `id` has a version `item` in storage, and enrols it if not.
+    Checks if the itemref with id `id` has a version `item{}` in storage, and enrols it if not.
     */
     this.checkEnrolItem = (id, item) => {
         let writeHashedItem = (id, h, item) => {
@@ -286,9 +232,6 @@ function FileManager(docID, basepath) {
         }
         let stringedItem = JSON.stringify(item);
         let ihash = hash(stringedItem);
-        if (!this.itemChunks[id]) {
-            this.itemChunks[id] = {};
-        }
         if (!this.itemChunks[id][ihash]) {
             writeHashedItem(id, ihash, item);
         } else {
@@ -306,48 +249,162 @@ function FileManager(docID, basepath) {
         return ihash;
     }
 
-    this.attachRemote = (connection, ID, soft) => {
-        this.remotes[ID] = connection;
-        if (!soft) {
-            // check settings of the remote and initiate a pull if we want
-            this.sendToRemote(ID, { op: "fmMessage", type: "sendHead", data: this.headCommit });
+    // Turns commits into a frontend-readable item dictionary
+    this.commitToItems = (commit) => {
+        let doc = {};
+        Object.entries(commit.items).forEach(i => {
+            if (this.itemChunks[i[0]]) {
+                doc[i[0]] = this.itemChunks[i[0]][i[1]];
+            } else {
+                console.log(`err: ${i[0]} not found from a commit`);
+            }
+        });
+        return doc;
+    }
+
+    // Turns item dictionary into a commit dated now
+    this.itemsToCommit = (items, source) => {
+            let commit = {
+                source: source,
+                timestamp: Date.now(),
+                items: {}
+            };
+            // process the items
+            for (let i in items) {
+                commit.items[i] = this.checkEnrolItem(i, items[i]);
+            }
+            return commit;
         }
+        /*==========================Client management=================================*/
+        //Called by the client to save a document
+    this.processClientIncoming = (doc) => {
+        let commit = this.itemsToCommit(doc);
+        let headCommit = this.localhead.latestCommit();
+        let mergedCommit = JSON.parse(JSON.stringify(commit));
+
+        let changes = [];
+        for (let k in headCommit.items) {
+            if (!mergedCommit.items[k] || headCommit.items[k]._lu_ > mergedCommit.items[k]._lu_) {
+                mergedCommit.items[k] = headCommit.items[k];
+            }
+        }
+        this.localhead.enrolCommit(commit);
+        mergedCommit.timestamp += 1;
+        this.localhead.enrolCommit(mergedCommit);
+        this.broadcastToRemotes({
+            type: "commitList",
+            data: Object.keys(this.localhead.commits)
+        });
+        return mergedCommit;
+    }
+
+    this.collateForClient = () => {
+        return this.commitToItems(this.localhead.latestCommit());
+    }
+
+
+    /*==========================Remote management=================================*/
+    /*
+    remote: dict of id to connection
+    */
+    this.remotes = {};
+    this.sendToRemote = (remoteID, obj) => {
+        obj.docID = this.docID;
+        obj.type = "fmMessage";
+        if (this.remotes[remoteID] && this.remotes[remoteID].connection) {
+            this.remotes[remoteID].connection.write(JSON.stringify(obj) + "\n");
+        } else {
+            console.log(`remote ${remoteID} did not exist!`);
+        }
+    }
+
+    this.broadcastToRemotes = (obj) => {
+        for (let r in this.remotes) {
+            try {
+                this.sendToRemote(r, obj);
+                console.log("sent to " + r);
+            } catch (e) {
+                console.log(e);
+                delete this.remotes[r];
+            }
+        }
+    }
+
+    this.attachRemote = (connection, remoteID, soft) => {
+        this.remotes[remoteID] = {
+            connection: connection
+        };
+
+        if (!soft) {
+            // Start a merge negotiation
+            this.sendToRemote(remoteID, { type: "commitList", data: Object.keys(this.localhead.commits) });
+        }
+    }
+    let pullRequestCompletionCallbacks = {};
+    // hard pull from remote when we don't have a copy on local
+    this.pullFromRemote = async(remoteID) => {
+        let doneCallbackID = Date.now();
+        return new Promise((res) => {
+            pullRequestCompletionCallbacks[doneCallbackID] = res;
+            this.sendToRemote(remoteID, { type: "requestCommitList", doneCallbackID: doneCallbackID });
+        });
     }
 
     this.handleRemoteMessage = (data, remoteID) => {
         console.log("got a message fr " + remoteID);
         switch (data.type) {
-            case "sendHead":
-                this.otherCommitCache[remoteID] = data.data;
-                if (!fs.existsSync(remoteCommitsPath + "/" + remoteID)) fs.mkdirSync(remoteCommitsPath + "/" + remoteID, { recursive: true });
-                fs.writeFileSync(remoteCommitsPath + "/" + remoteID + ".json", JSON.stringify(this.otherCommitCache[remoteID]));
-                let itemRequests = [];
-                for (let i in this.otherCommitCache[remoteID].items) {
-                    if (!this.itemChunks[i][this.otherCommitCache[remoteID].items[i]]) {
-                        itemRequests.push([i, this.otherCommitCache[remoteID].items[i]]);
+            case "requestCommitList":
+                //recieved when remote wants to pull our doc for the first time
+                this.sendToRemote(remoteID, { type: "commitList", data: Object.keys(this.localhead.commits), doneCallbackID: data.doneCallbackID });
+                break;
+            case "commitList":
+                //Check their commit list against our copy of their remote list
+                let ourCopyTheirs = Object.keys(this.commitsByServer[remoteID].commits).reduce((p, i) => ({ i: true, ...p }), {});
+                let theirs = data.data.reduce((p, i) => ({ i: true, ...p }), {});
+                let toRequest = [];
+                for (let i in theirs) {
+                    if (!ourCopyTheirs[i]) {
+                        toRequest.push(i);
                     }
                 }
-                this.sendToRemote(remoteID, { op: "fmMessage", type: "requestItems", data: itemRequests });
+                this.sendToRemote(remoteID, { type: "requestCommits", data: toRequest, doneCallbackID: data.doneCallbackID });
+                break;
+            case "requestCommits":
+                this.sendToRemote(remoteID, { type: "sendCommits", data: data.data.map(i => this.localhead.commits[i]), doneCallbackID: data.doneCallbackID });
+                break;
+            case "sendCommits":
+                let itemsWeDontHave = [];
+                data.data.forEach(i => {
+                    for (let itemID in i.items) {
+                        if (!this.itemChunks[itemID][i.items[itemID]]) {
+                            itemsWeDontHave.push([itemID, i.items[itemID]]);
+                        }
+                    }
+                    this.commitsByServer[remoteID].enrolCommit(i);
+                });
+                this.sendToRemote(remoteID, { type: "requestItems", data: itemsWeDontHave, doneCallbackID: data.doneCallbackID });
+                // figure out what items we don't have yet
+                // ask for them
+                // save the commits to disk
                 break;
             case "requestItems":
                 //send over the desired items
                 this.sendToRemote(remoteID, {
-                    op: "fmMessage",
                     type: "recieveItems",
-                    data: data.data.map(i => [i[0], i[1], this.itemChunks[i[0]][i[1]]])
+                    data: data.data.map(i => [i[0], this.itemChunks[i[0]][i[1]]]),
+                    doneCallbackID: data.doneCallbackID
                 });
                 break;
             case "recieveItems":
                 data.data.forEach(i => {
-                    this.itemChunks[i[0]][i[1]] = i[2];
-                })
+                    this.checkEnrolItem(i[0], i[2]);
+                });
+                if (data.doneCallbackID) {
+                    pullRequestCompletionCallbacks[data.doneCallbackID]();
+                }
                 break;
         }
-    }
-    this.pullFromRemote = (remoteID) => {
-        if (!remoteID) remoteID = Object.keys(this.otherCommitCache)[0];
-        this.headCommit = JSON.parse(JSON.stringify(this.otherCommitCache[remoteID]));
-    }
+    };
 }
 
 
@@ -386,9 +443,8 @@ module.exports = {
                 };
             }
             // tell everyone else that I have made a commit and they can add it to their list of commits if they want
-            availList[req.query.f].fileManager.processItemsAsCommit(polymorph_core.datautils.decompress(req.body), "LOCAL");
-            res.sendStatus(200);
-            res.end();
+            let result = availList[req.query.f].fileManager.processClientIncoming(polymorph_core.datautils.decompress(req.body), thisServerIdentifier);
+            res.status(200).send(JSON.stringify(result));
         });
 
         app.get("/gitload", async(req, res) => {
@@ -416,23 +472,10 @@ module.exports = {
             }
         });
 
-        app.get("/gitconflicts", async(req, res) => {
-            console.log("asked for conflicts");
-            if (!availList[req.query.f]) {
-                res.send(JSON.stringify(defaultBaseDocument(req.query.f)));
-                return; // document does not exist, probably bc user added savesource but made no changes and didnt save
-            }
-            if (!availList[req.query.f].fileManager) {
-                res.send("{}");
-                return;
-            }
-            res.send(JSON.stringify(availList[req.query.f].fileManager.collateConflicts()));
-        });
-
-
         let nng = new nanogram(undefined, {
             udpPort: 12482,
             callWord: "nanogram_gitlite",
+            id: thisServerIdentifier
         });
         // for each new peer, ask what documents they have
         let onlineClients = {};
@@ -507,33 +550,35 @@ module.exports = {
         });
 
         // create websocket server for the frontend
-        let wshtserver = http.createServer(function(request, response) {});
-        wshtserver.listen(29384, function() {});
+        if (private.gitWsOn) {
+            let wshtserver = http.createServer(function(request, response) {});
+            wshtserver.listen(29384, function() {});
 
-        wsServer = new WebSocketServer({
-            httpServer: wshtserver,
-            maxReceivedFrameSize: 10000000,
-            maxReceivedMessageSize: 10000000
-        });
+            wsServer = new WebSocketServer({
+                httpServer: wshtserver,
+                maxReceivedFrameSize: 10000000,
+                maxReceivedMessageSize: 10000000
+            });
 
-        wsServer.on('request', (rq) => {
-            let connection = rq.accept(null, rq.origin);
-            connection.on("message", async(m) => {
-                m = JSON.parse(m.utf8Data);
-                if (m.type == "selfID") {
-                    if (!availList[m.data]) {
-                        availList[m.data] = availList[req.query.f] = {
-                            id: req.query.f,
-                            type: "local",
-                            fileManager: new FileManager(req.query.f, private.baseGitLocation + "/" + req.query.f) //lazy load
-                        };
+            wsServer.on('request', (rq) => {
+                let connection = rq.accept(null, rq.origin);
+                connection.on("message", async(m) => {
+                    m = JSON.parse(m.utf8Data);
+                    if (m.type == "selfID") {
+                        if (!availList[m.data]) {
+                            availList[m.data] = availList[req.query.f] = {
+                                id: req.query.f,
+                                type: "local",
+                                fileManager: new FileManager(req.query.f, private.baseGitLocation + "/" + req.query.f) //lazy load
+                            };
+                        }
+                        if (availList[m.data].fileManager) {
+                            availList[m.data].fileManager = new FileManager(req.query.f, private.baseGitLocation + "/" + req.query.f);
+                        }
+                        availList[m.data].fileManager.attachFrontClient(connection);
                     }
-                    if (availList[m.data].fileManager) {
-                        availList[m.data].fileManager = new FileManager(req.query.f, private.baseGitLocation + "/" + req.query.f);
-                    }
-                    availList[m.data].fileManager.attachFrontClient(connection);
-                }
+                })
             })
-        })
+        }
     }
 }

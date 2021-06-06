@@ -1,0 +1,106 @@
+USER EXPERIENCE
+1 when user on any device, they have the latest version possible that may be a combination of different versions. 
+2 when user on any device, saved changes they made at any time will be accessible at a future point in time.
+3 user's storage does not explode
+---- 
+4 user can have conflicting changes presented to them and have them able to resolve it, on desktop only
+
+DATA DESIGN
+- documents with item LUs on the frontend
+- commits with origin / time on the backend
+    - stored synced on all devices
+    - write-once
+
+
+1 refer to item LUs to determine which ones to display at any point in time.
+2 save all commits between devices automagically
+
+PROCESS DESIGN
+
+TODO:
+- Save for merge-capable clients
+- Save for non-merge-capable clients
+- Client and client connection
+
+1. connect A and B polymorph backends
+2. open A polymorph frontend; open diffs pane; should see diffs against B. 
+3. make changes on A frontend; in real time, should see diffs in B against A update.
+4. be able to merge B changes into A using button on A.
+
+on client change head, share head with all connected
+
+on get head
+    - update head of remote
+    - check if items in head exist. If no, request items
+
+things that the browser client needs to be able to do:
+- fetch current fulldoc
+- push current fulldoc
+- fetch others' diffs 
+- [push live updates]
+- [realtime recieve updates to diffs] 
+
+things that the local hilagit needs to do:
+- give remote diffs to browser
+
+things that the remote hilagit needs to do:
+- ensure that their data is preserved on own device [done]
+- ensure that they have the latest version as frequently as possible
+- [extra] auto-merge changes from a common standpoint
+
+on peer connect:
+- Query and pull each others fulls
+- negotiate in the connection which is master n which is slave 
+- [auto-merge]
+    - from a common base? how?
+    - one changed, both changed since? last seen each other = ? 
+    1. load last common versions << store this somewhere
+    2. load previous of ours == what?
+    3. list out things that are both changed
+    4. load new of theirs [!!!]
+    5. load new of ours 
+    6. list all changes in ours
+    7. list all changes in theirs
+    8. for all changes in theirs, if there are not changes in ours, and not bothchanged, then adopt; else leave alone
+    9. save ours, save theirs, move lastCommonVerison flag to this
+    ---
+    10. Send listof hashof all my itemvers
+    11. Request listof those which are broken
+    12. request specific items that are missing
+    ---
+    client reloading
+    - client onsave, say change n plsreload (or autoupdate)
+    - if diffs btween client v and current v, client overwrites if newer than last version that was sent to client (need to keep track of last version that is sent to client)
+--------------------------------------------
+on client(merge-capabile) save: ** nonpersistent / lightweight, does not keep full version history (last one at best) **
+    - mergein new ver
+        read last common version (if missing AND not first time, reject)
+        if last common ver != their last common ver; reject, ask for pull. (who handles pull? frontend handles pull (both changed)? ) [working: force v reload]
+            -- automerge on frontend, but frontend doesn't know what old was! so send oldver + currentver to the frontend (!!! big - only send changes?) !! check automerge; if automerge then just pipeline as if user hit ok
+            list all changes in ours
+            list all changes in theirs
+            once merge confirmed, set last common ver to back last common ver
+        then hardSave; give new current key to client
+        ! cross browser hilagits need to talk to each other 
+    - notify client if there is a diff
+    - if any live, then tell them that we need to automerge again thx
+
+on client save without merge capability:
+    - switch to auto-force-pull for mobile clients: causes data loss!
+
+then if deltas are asked for then easy
+--------------------------------------------
+on client(non-merge-capable) save: ** nonpersistent / lightweight, does not keep full version history, cannot resolve changes **
+    * vers need to be accessible from merge-capable devices later, potentially on peers
+        - store vers as own in history << only need to if automerge doesn't work
+    - mergein new ver
+        read last common version (if missing AND not first time, reject)
+        if last common ver != their last common ver; reject, ask for pull. (who handles pull? frontend handles pull (both changed)? ) [working: force v reload]
+            -- automerge on frontend, but frontend doesn't know what old was! so send oldver + currentver to the frontend (!!! big - only send changes?) !! check automerge; if automerge then just pipeline as if user hit ok
+            list all changes in ours
+            list all changes in theirs
+            once merge confirmed, set last common ver to back last common ver
+        then hardSave; give new current key to client
+        ! cross browser hilagits need to talk to each other 
+    - notify client if there is a diff
+    - if any live, then tell them that we need to automerge again thx
