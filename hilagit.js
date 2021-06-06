@@ -334,9 +334,8 @@ function FileManager(docID, basepath) {
         this.remotes[remoteID] = {
             connection: connection
         };
-
+        // Start a merge negotiation
         if (!soft) {
-            // Start a merge negotiation
             this.sendToRemote(remoteID, { type: "commitList", data: Object.keys(this.localhead.commits) });
         }
     }
@@ -351,7 +350,7 @@ function FileManager(docID, basepath) {
     }
 
     this.handleRemoteMessage = (data, remoteID) => {
-        console.log("got a message fr " + remoteID);
+        console.log(`hilagit: ${remoteID} // ${docID} // ${data.type}`);
         switch (data.type) {
             case "requestCommitList":
                 //recieved when remote wants to pull our doc for the first time
