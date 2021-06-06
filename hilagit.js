@@ -310,7 +310,7 @@ function FileManager(docID, basepath) {
     this.remotes = {};
     this.sendToRemote = (remoteID, obj) => {
         obj.docID = this.docID;
-        obj.type = "fmMessage";
+        obj.op = "fmMessage";
         if (this.remotes[remoteID] && this.remotes[remoteID].connection) {
             this.remotes[remoteID].connection.write(JSON.stringify(obj) + "\n");
         } else {
