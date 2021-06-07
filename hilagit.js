@@ -153,9 +153,10 @@ function FileManager(docID, basepath) {
                 let tmpStorage = {};
                 if (fs.existsSync(folderPath)) {
                     if (fs.existsSync(folderPath)) {
-                        for (let commit in fs.readdirSync(folderPath)) {
+                        for (let commit of fs.readdirSync(folderPath)) {
                             if (commit.endsWith(".json")) {
-                                tmpStorage[remoteID][commit.slice(0, commit.length - 5)] = JSON.parse(fs.readFileSync(`${folderPath}/${commit}.json`).toString());
+                                console.log(commit.slice(0, commit.length - 5));
+                                tmpStorage[commit.slice(0, commit.length - 5)] = JSON.parse(fs.readFileSync(`${folderPath}/${commit}`).toString());
                             }
                         };
                     }
@@ -303,6 +304,7 @@ function FileManager(docID, basepath) {
     }
 
     this.collateForClient = () => {
+        console.log(this.localhead.latestCommit());
         return this.commitToItems(this.localhead.latestCommit());
     }
 
@@ -355,7 +357,7 @@ function FileManager(docID, basepath) {
     }
 
     this.handleRemoteMessage = (data, remoteID) => {
-        console.log(`hilagit recv:  ${remoteID} // ${docID} // ${data.type} // ${JSON.stringify(data.data).slice(0,10)}`);
+        console.log(`hilagit recv:  ${remoteID} // ${docID} // ${data.type} // ${JSON.stringify(data.data).slice(0, 10)}`);
         switch (data.type) {
             case "requestCommitList":
                 //recieved when remote wants to pull our doc for the first time
@@ -364,7 +366,10 @@ function FileManager(docID, basepath) {
             case "commitList":
                 //Check their commit list against our copy of their remote list
                 let ourCopyTheirs = Object.keys(this.commitsByServer[remoteID].commits).reduce((p, i) => ({ i: true, ...p }), {});
-                let theirs = data.data.reduce((p, i) => ({ i: true, ...p }), {});
+                let theirs = data.data.reduce((p, i) => {
+                    p[i] = true;
+                    return p
+                }, {});
                 let toRequest = [];
                 for (let i in theirs) {
                     if (!ourCopyTheirs[i]) {
