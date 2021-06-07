@@ -168,11 +168,7 @@ function FileManager(docID, basepath) {
                     latestCommit: () => {
                         let keys = Object.keys(tmpStorage);
                         keys.sort((a, b) => b - a);
-                        if (!keys.length) return {
-                            timestamp: 0,
-                            source: remoteID,
-                            items: defaultBaseDocument(docID)
-                        };
+                        if (!keys.length) return this.itemsToCommit(defaultBaseDocument(docID), thisServerIdentifier);
                         return tmpStorage[keys[0]];
                     },
                     enrolCommit: (commit) => {
@@ -386,18 +382,18 @@ function FileManager(docID, basepath) {
                 break;
             case "sendCommits":
                 let itemsWeDontHave = [];
+                // figure out what items we don't have yet
                 data.data.forEach(i => {
                     for (let itemID in i.items) {
                         if (!this.itemChunks[itemID][i.items[itemID]]) {
                             itemsWeDontHave.push([itemID, i.items[itemID]]);
                         }
                     }
+                    // save the commits to disk
                     this.commitsByServer[remoteID].enrolCommit(i);
                 });
+                // ask for the items we don't have
                 this.sendToRemote(remoteID, { type: "requestItems", data: itemsWeDontHave, doneCallbackID: data.doneCallbackID });
-                // figure out what items we don't have yet
-                // ask for them
-                // save the commits to disk
                 break;
             case "requestItems":
                 //send over the desired items
@@ -411,9 +407,26 @@ function FileManager(docID, basepath) {
                 data.data.forEach(i => {
                     this.checkEnrolItem(i[0], i[2]);
                 });
+                // merge
+                let headCommit = this.localhead.latestCommit();
+                let remoteCommit = this.commitsByServer[remoteID].latestCommit();
+                let mutableCopyLatestCommit = {
+                    source: thisServerIdentifier,
+                    timestamp: Date.now(),
+                    items: JSON.parse(JSON.stringify(headCommit.items))
+                };
+                let remoteItemsForChecking = this.commitToItems(headCommit);
+                let localItemsForChecking = this.commitToItems(remoteCommit);
+                for (let i in remoteItemsForChecking) {
+                    if (!localItemsForChecking[i] || localItemsForChecking[i]._lu_ < remoteItemsForChecking[i]._lu_) {
+                        this.mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
+                    }
+                }
+                this.localhead.enrolCommit(this.mutableCopyLatestCommit);
                 if (data.doneCallbackID) {
                     pullRequestCompletionCallbacks[data.doneCallbackID]();
                 }
+                // fetch the latest commit from the source we just potatoed
                 break;
         }
     };
