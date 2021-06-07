@@ -421,6 +421,10 @@ function FileManager(docID, basepath) {
                 let localItemsForChecking = this.commitToItems(headCommit);
                 let remoteItemsForChecking = this.commitToItems(remoteCommit);
                 for (let i in remoteItemsForChecking) {
+                    if (!remoteItemsForChecking[i]) {
+                        console.log(`WARNING: UNDEF ITEM ${i}`);
+                        continue;
+                    }
                     if (!localItemsForChecking[i] || localItemsForChecking[i]._lu_ < remoteItemsForChecking[i]._lu_) {
                         mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
                     }
