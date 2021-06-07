@@ -262,7 +262,7 @@ function FileManager(docID, basepath) {
         Object.entries(commit.items).forEach(i => {
             if (this.itemChunks[i[0]]) {
                 if (!this.itemChunks[i[0]][i[1]]) {
-                    //console.log(`err: ${i[1]} in ${i[0]} does not exist...`);
+                    console.log(`err: ${i[1]} in ${i[0]} does not exist, but ${i[0]} has ${Object.keys(this.itemChunks[i[0]]).length} other keys`);
                 } else {
                     doc[i[0]] = this.itemChunks[i[0]][i[1]];
                 }
@@ -406,11 +406,12 @@ function FileManager(docID, basepath) {
                 //send over the desired items
                 let thingsToSend = data.data.map(i => {
                     if (!this.itemChunks[i[0]][i[1]]) {
-                        console.log(`ERR: ${docID} requested missing item ${i[0]}::${i[1]}`);
+                        console.log(`ERR: ${remoteID}/${docID} requested missing item ${i[0]}::${i[1]}`);
                     } else {
                         return [i[0], this.itemChunks[i[0]][i[1]]];
                     }
                 });
+                console.log(`${remoteID}/${docID} Total item requests: ${thingsToSend.length}}`);
                 this.sendToRemote(remoteID, {
                     type: "recieveItems",
                     data: thingsToSend,
