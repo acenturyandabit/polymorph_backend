@@ -167,7 +167,11 @@ function FileManager(docID, basepath) {
                     latestCommit: () => {
                         let keys = Object.keys(tmpStorage);
                         keys.sort((a, b) => b - a);
-                        if (!keys.length) return {};
+                        if (!keys.length) return {
+                            timestamp: 0,
+                            source: remoteID,
+                            items: defaultBaseDocument(docID)
+                        };
                         return tmpStorage[keys[0]];
                     },
                     enrolCommit: (commit) => {
