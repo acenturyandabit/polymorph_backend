@@ -224,6 +224,9 @@ function FileManager(docID, basepath) {
     Checks if the itemref with id `id` has a version `item{}` in storage, and enrols it if not.
     */
     this.checkEnrolItem = (id, item) => {
+        if (!item) {
+            item = { "_lu_": 0 };
+        }
         let writeHashedItem = (id, h, item) => {
             this.itemChunks[id][h] = item;
             if (!fs.existsSync(itemChunksPath)) {
