@@ -168,12 +168,13 @@ function FileManager(docID, basepath) {
                     commits: tmpStorage,
                     latestCommit: () => {
                         let keys = Object.keys(tmpStorage);
+                        console.log(`${docID} had ${JSON.stringify(keys)} in keys`);
                         keys.sort((a, b) => b - a);
+                        console.log(`sorted keys were ${JSON.stringify(keys)}`);
                         if (!keys.length) return self.itemsToCommit(defaultBaseDocument(docID), thisServerIdentifier);
                         return tmpStorage[keys[0]];
                     },
                     enrolCommit: (commit) => {
-                        console.log(`${docID} enrolled ${commit.timestamp} with ${Object.keys(commit.items).length} itms`);
                         //add it to tmpstorage
                         tmpStorage[commit.timestamp] = commit;
                         // write it to file
@@ -425,7 +426,6 @@ function FileManager(docID, basepath) {
                         mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
                     }
                 }
-                console.log(`mutable had ${Object.keys(mutableCopyLatestCommit.items).length}`);
                 this.localhead.enrolCommit(mutableCopyLatestCommit);
                 if (data.doneCallbackID) {
                     pullRequestCompletionCallbacks[data.doneCallbackID]();
