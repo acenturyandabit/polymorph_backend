@@ -317,6 +317,7 @@ function FileManager(docID, basepath) {
         obj.op = "fmMessage";
         if (this.remotes[remoteID] && this.remotes[remoteID].connection) {
             this.remotes[remoteID].connection.write(JSON.stringify(obj) + "\n");
+            console.log(`hilagit send:  ${remoteID} // ${docID} // ${obj.type}`);
         } else {
             console.log(`remote ${remoteID} did not exist!`);
         }
@@ -354,7 +355,7 @@ function FileManager(docID, basepath) {
     }
 
     this.handleRemoteMessage = (data, remoteID) => {
-        console.log(`hilagit: ${remoteID} // ${docID} // ${data.type}`);
+        console.log(`hilagit recv:  ${remoteID} // ${docID} // ${data.type} // ${JSON.stringify(data).slice(0,10)}`);
         switch (data.type) {
             case "requestCommitList":
                 //recieved when remote wants to pull our doc for the first time
