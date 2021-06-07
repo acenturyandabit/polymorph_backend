@@ -306,7 +306,7 @@ function FileManager(docID, basepath) {
             type: "commitList",
             data: Object.keys(this.localhead.commits)
         });
-        return mergedCommit;
+        return this.commitToItems(mergedCommit);
     }
 
     this.collateForClient = () => {
@@ -325,8 +325,13 @@ function FileManager(docID, basepath) {
         obj.docID = this.docID;
         obj.op = "fmMessage";
         if (this.remotes[remoteID] && this.remotes[remoteID].connection) {
-            this.remotes[remoteID].connection.write(JSON.stringify(obj) + "\n");
             console.log(`hilagit send:  ${remoteID} // ${docID} // ${obj.type}`);
+            try {
+                this.remotes[remoteID].connection.write(JSON.stringify(obj) + "\n");
+            } catch (e) {
+                console.log(`${docID}: Remote ${remoteID} stream closed.`);
+                delete this.remotes[remoteID];
+            }
         } else {
             console.log(`remote ${remoteID} did not exist!`);
         }
