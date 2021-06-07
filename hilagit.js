@@ -418,12 +418,13 @@ function FileManager(docID, basepath) {
                 };
                 let remoteItemsForChecking = this.commitToItems(headCommit);
                 let localItemsForChecking = this.commitToItems(remoteCommit);
+                console.log(Object.keys(remoteItemsForChecking).length);
                 for (let i in remoteItemsForChecking) {
                     if (!localItemsForChecking[i] || localItemsForChecking[i]._lu_ < remoteItemsForChecking[i]._lu_) {
-                        this.mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
+                        mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
                     }
                 }
-                this.localhead.enrolCommit(this.mutableCopyLatestCommit);
+                this.localhead.enrolCommit(mutableCopyLatestCommit);
                 if (data.doneCallbackID) {
                     pullRequestCompletionCallbacks[data.doneCallbackID]();
                 }
