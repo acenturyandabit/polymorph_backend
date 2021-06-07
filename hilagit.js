@@ -261,6 +261,9 @@ function FileManager(docID, basepath) {
         let doc = {};
         Object.entries(commit.items).forEach(i => {
             if (this.itemChunks[i[0]]) {
+                if (!this.itemChunks[i[0]][i[1]]) {
+                    console.log(`err: ${i[1]} in ${i[0]} does not exist...`);
+                }
                 doc[i[0]] = this.itemChunks[i[0]][i[1]];
             } else {
                 console.log(`err: ${i[0]} not found from a commit`);
@@ -400,9 +403,16 @@ function FileManager(docID, basepath) {
                 break;
             case "requestItems":
                 //send over the desired items
+                let thingsToSend = data.data.map(i => {
+                    if (!this.itemChunks[i[0]][i[1]]) {
+                        console.log(`ERR: ${docID} requested missing item ${i[0]}::${i[1]}`);
+                    } else {
+                        return [i[0], this.itemChunks[i[0]][i[1]]];
+                    }
+                });
                 this.sendToRemote(remoteID, {
                     type: "recieveItems",
-                    data: data.data.map(i => [i[0], this.itemChunks[i[0]][i[1]]]),
+                    data: thingsToSend,
                     doneCallbackID: data.doneCallbackID
                 });
                 break;
@@ -422,7 +432,7 @@ function FileManager(docID, basepath) {
                 let remoteItemsForChecking = this.commitToItems(remoteCommit);
                 for (let i in remoteItemsForChecking) {
                     if (!remoteItemsForChecking[i]) {
-                        console.log(`WARNING: UNDEF ITEM ${i}`);
+                        //console.log(`WARNING: UNDEF ITEM ${i}`);
                         continue;
                     }
                     if (!localItemsForChecking[i] || localItemsForChecking[i]._lu_ < remoteItemsForChecking[i]._lu_) {
