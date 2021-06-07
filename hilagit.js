@@ -442,6 +442,7 @@ function FileManager(docID, basepath) {
                     }
                     if (!localItemsForChecking[i] || localItemsForChecking[i]._lu_ < remoteItemsForChecking[i]._lu_) {
                         mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
+                        console.log(`${docID} updating ${i} from ${remoteID}`);
                     }
                 }
                 this.localhead.enrolCommit(mutableCopyLatestCommit);
