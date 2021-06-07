@@ -143,6 +143,7 @@ function FileManager(docID, basepath) {
                 /<date>.json
     */
     this._commitsByServer = {};
+    let self = this; // used in itemsToCommit in target[remoteID]=>latestCommit
     this.commitsByServer = new Proxy(this._commitsByServer, {
         get: function(target, remoteID) {
             if (!target[remoteID]) {
@@ -168,7 +169,7 @@ function FileManager(docID, basepath) {
                     latestCommit: () => {
                         let keys = Object.keys(tmpStorage);
                         keys.sort((a, b) => b - a);
-                        if (!keys.length) return this.itemsToCommit(defaultBaseDocument(docID), thisServerIdentifier);
+                        if (!keys.length) return self.itemsToCommit(defaultBaseDocument(docID), thisServerIdentifier);
                         return tmpStorage[keys[0]];
                     },
                     enrolCommit: (commit) => {
