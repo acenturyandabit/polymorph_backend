@@ -290,9 +290,9 @@ function FileManager(docID, basepath) {
         let commit = this.itemsToCommit(doc);
         let headCommit = this.localhead.latestCommit();
         let mergedCommit = JSON.parse(JSON.stringify(commit));
-
+        let headItems = this.commitToItems(headCommit);
         for (let k in headCommit.items) {
-            if (!mergedCommit.items[k] || headCommit.items[k]._lu_ > mergedCommit.items[k]._lu_) {
+            if (!doc[k] || headItems[k]._lu_ > doc[k]._lu_) {
                 mergedCommit.items[k] = headCommit.items[k];
                 console.log(`${docID} client merge updated ${k}`);
             }
@@ -415,7 +415,7 @@ function FileManager(docID, basepath) {
                         return [i[0], this.itemChunks[i[0]][i[1]]];
                     }
                 });
-                console.log(`${remoteID}/${docID} Total item requests: ${thingsToSend.length}}`);
+                console.log(`${remoteID}/${docID} Total item requests: ${thingsToSend.length}`);
                 this.sendToRemote(remoteID, {
                     type: "recieveItems",
                     data: thingsToSend,
