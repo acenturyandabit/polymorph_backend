@@ -224,6 +224,7 @@ function FileManager(docID, basepath) {
     */
     this.checkEnrolItem = (id, item) => {
         if (!item) {
+            console.log(`ERR: ${docID} got empty for ${id}, used default zeros`);
             item = { "_lu_": 0 };
         }
         let writeHashedItem = (id, h, item) => {
@@ -262,7 +263,7 @@ function FileManager(docID, basepath) {
         Object.entries(commit.items).forEach(i => {
             if (this.itemChunks[i[0]]) {
                 if (!this.itemChunks[i[0]][i[1]]) {
-                    console.log(`err: ${i[1]} in ${i[0]} does not exist, but ${i[0]} is ${JSON.stringify(this.itemChunks[i[0]])}`);
+                    //console.log(`err: ${i[1]} in ${i[0]} does not exist, but ${i[0]} is ${JSON.stringify(this.itemChunks[i[0]])}`);
                 } else {
                     doc[i[0]] = this.itemChunks[i[0]][i[1]];
                 }
