@@ -305,8 +305,9 @@ function FileManager(docID, basepath) {
     }
 
     this.collateForClient = () => {
-        console.log(this.localhead.latestCommit());
-        return this.commitToItems(this.localhead.latestCommit());
+        let headCommit = this.localhead.latestCommit();
+        console.log(headCommit.timestamp);
+        return this.commitToItems(headCommit);
     }
 
 
@@ -385,7 +386,6 @@ function FileManager(docID, basepath) {
             case "sendCommits":
                 let itemsWeDontHave = [];
                 // figure out what items we don't have yet
-                console.log(`sendcommits data ${JSON.stringify(data.data)}`);
                 data.data.forEach(i => {
                     for (let itemID in i.items) {
                         if (!this.itemChunks[itemID][i.items[itemID]]) {
@@ -420,7 +420,6 @@ function FileManager(docID, basepath) {
                 };
                 let localItemsForChecking = this.commitToItems(headCommit);
                 let remoteItemsForChecking = this.commitToItems(remoteCommit);
-                console.log(Object.keys(remoteItemsForChecking).length);
                 for (let i in remoteItemsForChecking) {
                     if (!localItemsForChecking[i] || localItemsForChecking[i]._lu_ < remoteItemsForChecking[i]._lu_) {
                         mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
