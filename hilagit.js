@@ -287,7 +287,6 @@ function FileManager(docID, basepath) {
         let headCommit = this.localhead.latestCommit();
         let mergedCommit = JSON.parse(JSON.stringify(commit));
 
-        let changes = [];
         for (let k in headCommit.items) {
             if (!mergedCommit.items[k] || headCommit.items[k]._lu_ > mergedCommit.items[k]._lu_) {
                 mergedCommit.items[k] = headCommit.items[k];
@@ -384,7 +383,7 @@ function FileManager(docID, basepath) {
             case "sendCommits":
                 let itemsWeDontHave = [];
                 // figure out what items we don't have yet
-                console.log(`sendcommits data ${data.data}`);
+                console.log(`sendcommits data ${JSON.stringify(data.data)}`);
                 data.data.forEach(i => {
                     for (let itemID in i.items) {
                         if (!this.itemChunks[itemID][i.items[itemID]]) {
