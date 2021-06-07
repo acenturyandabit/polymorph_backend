@@ -355,7 +355,7 @@ function FileManager(docID, basepath) {
     }
 
     this.handleRemoteMessage = (data, remoteID) => {
-        console.log(`hilagit recv:  ${remoteID} // ${docID} // ${data.type} // ${JSON.stringify(data).slice(0,10)}`);
+        console.log(`hilagit recv:  ${remoteID} // ${docID} // ${data.type} // ${JSON.stringify(data.data).slice(0,10)}`);
         switch (data.type) {
             case "requestCommitList":
                 //recieved when remote wants to pull our doc for the first time
