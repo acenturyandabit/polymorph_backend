@@ -421,7 +421,7 @@ function FileManager(docID, basepath) {
                 break;
             case "recieveItems":
                 data.data.forEach(i => {
-                    this.checkEnrolItem(i[0], i[2]);
+                    this.checkEnrolItem(i[0], i[1]);
                 });
                 // merge
                 let headCommit = this.localhead.latestCommit();
