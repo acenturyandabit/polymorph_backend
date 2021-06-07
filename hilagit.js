@@ -262,9 +262,10 @@ function FileManager(docID, basepath) {
         Object.entries(commit.items).forEach(i => {
             if (this.itemChunks[i[0]]) {
                 if (!this.itemChunks[i[0]][i[1]]) {
-                    console.log(`err: ${i[1]} in ${i[0]} does not exist...`);
+                    //console.log(`err: ${i[1]} in ${i[0]} does not exist...`);
+                } else {
+                    doc[i[0]] = this.itemChunks[i[0]][i[1]];
                 }
-                doc[i[0]] = this.itemChunks[i[0]][i[1]];
             } else {
                 console.log(`err: ${i[0]} not found from a commit`);
             }
