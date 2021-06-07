@@ -156,7 +156,6 @@ function FileManager(docID, basepath) {
                     if (fs.existsSync(folderPath)) {
                         for (let commit of fs.readdirSync(folderPath)) {
                             if (commit.endsWith(".json")) {
-                                console.log(commit.slice(0, commit.length - 5));
                                 tmpStorage[commit.slice(0, commit.length - 5)] = JSON.parse(fs.readFileSync(`${folderPath}/${commit}`).toString());
                             }
                         };
@@ -168,9 +167,7 @@ function FileManager(docID, basepath) {
                     commits: tmpStorage,
                     latestCommit: () => {
                         let keys = Object.keys(tmpStorage);
-                        console.log(`${docID} had ${JSON.stringify(keys)} in keys`);
                         keys.sort((a, b) => b - a);
-                        console.log(`sorted keys were ${JSON.stringify(keys)}`);
                         if (!keys.length) return self.itemsToCommit(defaultBaseDocument(docID), thisServerIdentifier);
                         return tmpStorage[keys[0]];
                     },
@@ -440,7 +437,7 @@ function FileManager(docID, basepath) {
                 let remoteItemsForChecking = this.commitToItems(remoteCommit);
                 for (let i in remoteItemsForChecking) {
                     if (!remoteItemsForChecking[i]) {
-                        //console.log(`WARNING: UNDEF ITEM ${i}`);
+                        console.log(`WARNING: UNDEF ITEM ${i}`);
                         continue;
                     }
                     if (!localItemsForChecking[i] || localItemsForChecking[i]._lu_ < remoteItemsForChecking[i]._lu_) {
