@@ -294,6 +294,7 @@ function FileManager(docID, basepath) {
         for (let k in headCommit.items) {
             if (!mergedCommit.items[k] || headCommit.items[k]._lu_ > mergedCommit.items[k]._lu_) {
                 mergedCommit.items[k] = headCommit.items[k];
+                console.log(`${docID} client merge updated ${k}`);
             }
         }
         this.localhead.enrolCommit(commit);
