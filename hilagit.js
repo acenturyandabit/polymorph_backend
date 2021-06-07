@@ -384,6 +384,7 @@ function FileManager(docID, basepath) {
             case "sendCommits":
                 let itemsWeDontHave = [];
                 // figure out what items we don't have yet
+                console.log(`sendcommits data ${data.data}`);
                 data.data.forEach(i => {
                     for (let itemID in i.items) {
                         if (!this.itemChunks[itemID][i.items[itemID]]) {
