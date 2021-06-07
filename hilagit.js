@@ -499,10 +499,9 @@ module.exports = {
             }
         });
 
-        let nng = new nanogram(undefined, {
+        let nng = new nanogram(thisServerIdentifier, {
             udpPort: 12482,
-            callWord: "nanogram_gitlite",
-            id: thisServerIdentifier
+            callWord: "nanogram_gitlite"
         });
         // for each new peer, ask what documents they have
         let onlineClients = {};
