@@ -173,6 +173,7 @@ function FileManager(docID, basepath) {
                         return tmpStorage[keys[0]];
                     },
                     enrolCommit: (commit) => {
+                        console.log(`${docID} enrolled ${commit.timestamp} with ${Object.keys(commit.items).length} itms`);
                         //add it to tmpstorage
                         tmpStorage[commit.timestamp] = commit;
                         // write it to file
@@ -416,14 +417,15 @@ function FileManager(docID, basepath) {
                     timestamp: Date.now(),
                     items: JSON.parse(JSON.stringify(headCommit.items))
                 };
-                let remoteItemsForChecking = this.commitToItems(headCommit);
-                let localItemsForChecking = this.commitToItems(remoteCommit);
+                let localItemsForChecking = this.commitToItems(headCommit);
+                let remoteItemsForChecking = this.commitToItems(remoteCommit);
                 console.log(Object.keys(remoteItemsForChecking).length);
                 for (let i in remoteItemsForChecking) {
                     if (!localItemsForChecking[i] || localItemsForChecking[i]._lu_ < remoteItemsForChecking[i]._lu_) {
                         mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
                     }
                 }
+                console.log(`mutable had ${Object.keys(mutableCopyLatestCommit.items).length}`);
                 this.localhead.enrolCommit(mutableCopyLatestCommit);
                 if (data.doneCallbackID) {
                     pullRequestCompletionCallbacks[data.doneCallbackID]();
