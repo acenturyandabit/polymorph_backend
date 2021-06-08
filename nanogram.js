@@ -102,6 +102,8 @@ module.exports = function nanogram(id, _options) {
         console.log(`server error:\n${err.stack}`);
         server.close();
     });
+
+
     let knownPeers = {};
     server.on('message', (msg, rinfo) => {
         //if in correct format, add to the list
@@ -228,7 +230,9 @@ module.exports = function nanogram(id, _options) {
     })
 
     tcpserv.listen(options.transmitPort, "0.0.0.0");
-
+    tcpserv.on('clientError', (e, socket) => {
+        socket.end();
+    })
     this.connectTo = async(targetID) => {
         return new Promise((res) => {
             if (targetID < id) {
