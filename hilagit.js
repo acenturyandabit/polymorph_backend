@@ -406,7 +406,7 @@ function FileManager(docID, basepath) {
                 break;
             case "commitList":
                 //Check their commit list against our copy of their remote list
-                let ourCopyTheirs = Object.keys(this.commitsByServer[remoteID].commits).reduce((p, i) => ({ i: true, ...p }), {});
+                let ourCopyTheirs = Object.keys(this.commits).reduce((p, i) => ({ i: true, ...p }), {});
                 let theirs = data.data.reduce((p, i) => {
                     p[i] = true;
                     return p
@@ -432,7 +432,7 @@ function FileManager(docID, basepath) {
                         }
                     }
                     // save the commits to disk
-                    this.commitsByServer[remoteID].enrolCommit(i);
+                    this.enrolCommit(i);
                 });
                 // ask for the items we don't have
                 this.sendToRemote(remoteID, { type: "requestItems", data: itemsWeDontHave, doneCallbackID: data.doneCallbackID });
