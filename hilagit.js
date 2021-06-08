@@ -143,6 +143,7 @@ function FileManager(docID, basepath) {
     };
     this.getLatestCommitFrom = (remoteID) => {
         let list = [];
+        console.log(`all commits:${Object.keys(this.commits)}`);
         for (let i in this.commits) {
             if (this.commits[i].source == remoteID) {
                 list.push(this.commits[i]);
@@ -162,13 +163,16 @@ function FileManager(docID, basepath) {
     });
     Object.defineProperty(this, "headBaseCommitID", {
         get: () => {
+            console.log(`headcommit was ${this.headCommit.timestamp}, basecommit was ${this.headCommit.baseCommit}`);
             if (this.headCommit.baseCommit) return this.headCommit.baseCommit;
             else return this.headCommit.timestamp;
         }
     });
     this.enrolCommit = (commit) => {
         // assuming commit is already compressed
+        console.log(`enrolled commit ${commit.timestamp}`);
         this.commits[commit.timestamp] = commit;
+        console.log(`commit now: ${Object.keys(this.commits)}`);
         fs.writeFileSync(`${commitsPath}/${commit.timestamp}.json`, JSON.stringify(commit));
         return commit;
     }
@@ -297,7 +301,9 @@ function FileManager(docID, basepath) {
         console.log(`saved ${itemSavings}/${itemTotal} items`);
         // count keys, if more than n/4 keys diff, rewrite
         // n/4 is arbitrary, but should be dependent on n.
+        console.log(`${Object.keys(commit.items).length} vs ${Object.keys(this.commits[commit.baseCommit].items).length}`);
         if (Object.keys(commit.items).length > Object.keys(this.commits[commit.baseCommit].items).length / 4) {
+            console.log("override done");
             commit.items = cachedFullItems;
             commit.baseCommit = "";
         }
@@ -340,12 +346,12 @@ function FileManager(docID, basepath) {
         }
         let shouldSaveIncoming = false;
         for (let c in commit.items) {
-            if (!headItems[c] || headItems[c]._lu_ < commit.items[c]._lu_) {
+            if (!headItems[c] || headItems[c]._lu_ < commit.items[c]) {
                 shouldSaveIncoming = true;
             }
         }
         // orignal commit might be newest tho so save it
-        if (shouldSaveMerged) {
+        if (shouldSaveIncoming) {
             this.enrolCommit(commit);
         }
         if (shouldSaveMerged) {
