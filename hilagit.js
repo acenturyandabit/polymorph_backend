@@ -143,7 +143,6 @@ function FileManager(docID, basepath) {
     };
     this.getLatestCommitFrom = (remoteID) => {
         let list = [];
-        console.log(JSON.stringify(Object.values(this.commits).map(i => [i.timestamp, i.source]))); // gro
         for (let i in this.commits) {
             if (this.commits[i].source == remoteID) {
                 list.push(this.commits[i]);
@@ -154,7 +153,6 @@ function FileManager(docID, basepath) {
             return this.enrolCommit(this.itemsToCommit(defaultBaseDocument(docID), remoteID, true));
         }
         list.sort((a, b) => b.timestamp - a.timestamp);
-        console.log(`${JSON.stringify(list.map(i=>i.timestamp))}`); // gro
         return list[0];
     }
     Object.defineProperty(this, "headCommit", {
@@ -354,7 +352,7 @@ function FileManager(docID, basepath) {
         obj.docID = this.docID;
         obj.op = "fmMessage";
         if (this.remotes[remoteID] && this.remotes[remoteID].connection) {
-            console.log(`hilagit send:  ${remoteID} // ${docID} // ${obj.type}`);
+            console.log(`hilagit send:  ${remoteID} // ${docID} // ${obj.type} // ${JSON.stringify(obj).slice(0,10)}`);
             try {
                 this.remotes[remoteID].connection.write(JSON.stringify(obj) + "\n");
             } catch (e) {
