@@ -1,0 +1,18 @@
+observations:
+- want to minimise the amount of hard disk
+- want to minimise the amount of processing power
+- want to minimise the amount of ram
+- life cycle of a commit
+    - client items: all items
+    - generated from client items
+    - merge with existing commit by lu
+    - generated from client commit merge
+    - stored
+    - transmitted
+    - merge with existing commit by lu
+    - retrieved as part of client merge
+
+ideas: 
+delta from x to y, with a reference
+
+dont want to eat up huge amounts of ram

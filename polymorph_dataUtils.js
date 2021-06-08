@@ -61,7 +61,7 @@ module.exports = {
                         let newkey = numberToEncodable(encodingIndex);
                         km[newkey] = i;
                         for (let it in data.items) {
-                            if (data.items[it][i]) {
+                            if (i in data.items[it]) {
                                 data.items[it][newkey] = data.items[it][i];
                                 delete data.items[it][i];
                             }
@@ -75,7 +75,7 @@ module.exports = {
             decompress: function(data, cid) {
                 for (let it in data.items) {
                     for (let k in data.compressions[cid].keymap) {
-                        if (data.items[it][k]) {
+                        if (k in data.items[it]) {
                             data.items[it][data.compressions[cid].keymap[k]] = data.items[it][k];
                             delete data.items[it][k];
                         }
