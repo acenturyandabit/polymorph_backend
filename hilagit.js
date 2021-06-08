@@ -337,7 +337,7 @@ function FileManager(docID, basepath) {
         let mergedCommit = JSON.parse(JSON.stringify(commit));
         let headItems = this.commitToItems(headCommit);
         let shouldSaveMerged = false;
-        for (let k in headCommit.items) {
+        for (let k in headItems) {
             if (!doc[k] || headItems[k]._lu_ > doc[k]._lu_) {
                 mergedCommit.items[k] = headCommit.items[k];
                 shouldSaveMerged = true;
