@@ -249,8 +249,8 @@ function FileManager(docID, basepath) {
 
     this.getInflatedCommit = (commit) => {
         if (!commit.baseCommit) return commit;
-        let inflatedCommit = JSON.parse(JSON.stringify(this.commits[commit.baseCommit].items));
-        Object.assign(inflatedCommit, commit.items);
+        let inflatedCommit = JSON.parse(JSON.stringify(this.commits[commit.baseCommit]));
+        Object.assign(inflatedCommit.items, commit.items);
         return inflatedCommit;
     }
 
@@ -275,16 +275,26 @@ function FileManager(docID, basepath) {
 
     this.compressCommit = (commit) => {
         if (!commit.baseCommit) commit.baseCommit = this.headBaseCommitID;
-        // delete items that are common to the headBaseCommit
+        console.log(`compressing ${commit.timestamp} against ${commit.baseCommit} `)
+            // delete items that are common to the headBaseCommit
         let cachedFullItems = JSON.parse(JSON.stringify(commit.items));
-        let headBase = this.commits[commit.baseCommit];
+        if (!this.commits[commit.baseCommit]) {
+            console.log(`ERR: baseCommit ${commit.baseCommit} for ${commit.timestamp} did not exist. skipping compression.`);
+            commit.baseCommit = "";
+            return commit;
+        }
+        let headBase = this.commits[commit.baseCommit].items;
+        let itemTotal = Object.keys(commit.items).length;
+        let itemSavings = 0;
         if (headBase) {
             for (let i in headBase) {
                 if (commit.items[i] == headBase[i]) {
                     delete commit.items[i];
+                    itemSavings++;
                 }
             }
         }
+        console.log(`saved ${itemSavings}/${itemTotal} items`);
         // count keys, if more than n/4 keys diff, rewrite
         // n/4 is arbitrary, but should be dependent on n.
         if (Object.keys(commit.items).length > Object.keys(this.commits[commit.baseCommit].items).length / 4) {
@@ -320,19 +330,36 @@ function FileManager(docID, basepath) {
         let headCommit = this.getLatestCommitFrom(thisServerIdentifier);
         let mergedCommit = JSON.parse(JSON.stringify(commit));
         let headItems = this.commitToItems(headCommit);
+        let shouldSaveMerged = false;
         for (let k in headCommit.items) {
             if (!doc[k] || headItems[k]._lu_ > doc[k]._lu_) {
                 mergedCommit.items[k] = headCommit.items[k];
+                shouldSaveMerged = true;
                 console.log(`${docID} client merge updated ${k}`);
             }
         }
-        this.enrolCommit(commit);
-        mergedCommit.timestamp += 1;
-        this.enrolCommit(mergedCommit);
-        this.broadcastToRemotes({
-            type: "commitList",
-            data: Object.keys(this.commits)
-        });
+        let shouldSaveIncoming = false;
+        for (let c in commit.items) {
+            if (!headItems[c] || headItems[c]._lu_ < commit.items[c]._lu_) {
+                shouldSaveIncoming = true;
+            }
+        }
+        // orignal commit might be newest tho so save it
+        if (shouldSaveMerged) {
+            this.enrolCommit(commit);
+        }
+        if (shouldSaveMerged) {
+            // something has changed, so actually save stuff
+            // edit the timestamp so it doesn't conflict with the incoming
+            mergedCommit.timestamp += 1;
+            this.enrolCommit(mergedCommit);
+        }
+        if (shouldSaveMerged || shouldSaveIncoming) {
+            this.broadcastToRemotes({
+                type: "commitList",
+                data: Object.keys(this.commits)
+            });
+        }
         return this.commitToItems(mergedCommit);
     }
 
