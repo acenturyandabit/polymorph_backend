@@ -171,7 +171,7 @@ function FileManager(docID, basepath) {
     });
     this.enrolCommit = (commit) => {
         // assuming commit is already compressed
-        console.log(`enrolled commit ${commit.timestamp}`);
+        //console.log(`enrolled commit ${commit.timestamp}`);
         this.commits[commit.timestamp] = commit;
         fs.writeFileSync(`${commitsPath}/${commit.timestamp}.json`, JSON.stringify(commit));
         return commit;
@@ -388,7 +388,7 @@ function FileManager(docID, basepath) {
         if (this.remotes[remoteID] && this.remotes[remoteID].connection) {
             try {
                 let resend = () => {
-                    console.log(`hilagit send:  ${remoteID} // ${docID} // ${obj.type} // ${JSON.stringify(obj).slice(0, 10)}`);
+                    //console.log(`hilagit send:  ${remoteID} // ${docID} // ${obj.type} // ${JSON.stringify(obj).slice(0, 10)}`);
                     this.remotes[remoteID].connection.write(JSON.stringify(obj) + "\n");
                     if (!this.remotes[remoteID].firstMessageSentOK) {
                         setTimeout(() => {
@@ -443,7 +443,7 @@ function FileManager(docID, basepath) {
     }
 
     this.handleRemoteMessage = (data, remoteID) => {
-        console.log(`hilagit recv:  ${remoteID} // ${docID} // ${data.type} // ${JSON.stringify(data.data).slice(0, 10)}`);
+        //console.log(`hilagit recv:  ${remoteID} // ${docID} // ${data.type} // ${JSON.stringify(data.data).slice(0, 10)}`);
         this.remotes[remoteID].firstMessageSentOK = true;
         switch (data.type) {
             case "requestCommitList":
@@ -645,7 +645,7 @@ module.exports = {
                         console.log(`JSON PARSE FAILED! Chunk: ${data.slice(0, 25)}...${data.slice(data.length - 25)}`);
                         break;
                     }
-                    console.log(data.op, client.id);
+                    //console.log(data.op, client.id);
                     switch (data.op) {
                         case "fmMessage":
                             if (!availList[data.docID]) {
@@ -666,12 +666,12 @@ module.exports = {
             client.connection.on("error", async(e) => {
                 //probably an errconreset
                 delete onlineClients[client.id];
-                console.log("closed " + client.id + " ," + e);
+                console.log("error closed " + client.id + " ," + e);
                 await nng.connectTo(client.id);
             })
             client.connection.on("close", async(e) => {
                 delete onlineClients[client.id];
-                console.log("closed " + client.id + " ," + e);
+                console.log("close closed " + client.id + " ," + e);
                 await nng.connectTo(client.id);
             })
         }
