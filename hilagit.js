@@ -215,6 +215,7 @@ function FileManager(docID, basepath) {
         }
         let writeHashedItem = (id, h, item) => {
             this.itemChunks[id][h] = item;
+            item._lu_ = h;
             if (!fs.existsSync(itemChunksPath)) {
                 fs.mkdirSync(itemChunksPath, { recursive: true });
             }
