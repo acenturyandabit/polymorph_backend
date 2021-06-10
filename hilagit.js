@@ -265,7 +265,7 @@ function FileManager(docID, basepath) {
         Object.entries(inflatedCommit.items).forEach(i => {
             if (this.itemChunks[i[0]]) {
                 if (!this.itemChunks[i[0]][i[1]]) {
-                    console.log(`err: ${i[1]} in ${i[0]} does not exist, but ${i[0]} is ${JSON.stringify(this.itemChunks[i[0]])}`);
+                    console.log(`err: ${i[1]} in ${i[0]} does not exist, but ${i[0]} is ${JSON.stringify(this.itemChunks[i[0]]).slice(10)}`);
                 } else {
                     doc[i[0]] = this.itemChunks[i[0]][i[1]];
                 }
