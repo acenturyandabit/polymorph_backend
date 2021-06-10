@@ -255,9 +255,9 @@ function FileManager(docID, basepath) {
         console.log(`inflating ${commit.timestamp} off head ${commit.baseCommit}`);
         if (!commit.baseCommit) return commit;
         let inflatedCommit = JSON.parse(JSON.stringify(this.commits[commit.baseCommit]));
-        console.log(`inflated ${Object.keys(inflatedCommit.items)}/${Object.keys(commit.items)} keys....`);
+        console.log(`inflated ${Object.keys(inflatedCommit.items).length}/${Object.keys(commit.items).length} keys....`);
         Object.assign(inflatedCommit.items, commit.items);
-        console.log(`to ${Object.keys(inflatedCommit.items)} keys....`);
+        console.log(`to ${Object.keys(inflatedCommit.items).length} keys....`);
         return inflatedCommit;
     }
 
