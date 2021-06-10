@@ -517,7 +517,7 @@ function FileManager(docID, basepath) {
                 let mutableCopyLatestCommit = {
                     source: thisServerIdentifier,
                     timestamp: Date.now(),
-                    items: JSON.parse(JSON.stringify(inflatedHeadCommit.items))
+                    items: JSON.parse(JSON.stringify(inflatedHeadCommit.items)),
                 };
                 for (let i in inflatedRemoteCommit.items) {
                     if (!inflatedRemoteCommit.items[i]) {
@@ -531,7 +531,7 @@ function FileManager(docID, basepath) {
                 }
                 // compress the commit
 
-
+                mutableCopyLatestCommit = this.compressCommit(mutableCopyLatestCommit);
                 // enrol the commit
                 this.enrolCommit(mutableCopyLatestCommit);
                 console.log(`mutable had n keys: ${Object.keys(mutableCopyLatestCommit.items).length}`);
