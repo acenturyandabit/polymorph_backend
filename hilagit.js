@@ -392,7 +392,7 @@ function FileManager(docID, basepath) {
                         setTimeout(() => {
                             if (!this.remotes[remoteID].firstMessageSentOK) {
                                 // something's gone wrong, ask nanogram to close the connection
-                                this.remotes[remoteID].connection.close();
+                                this.remotes[remoteID].connection.end();
                                 nanogram.connectTo(remoteID);
                             }
                         }, 2000);
