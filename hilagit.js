@@ -385,9 +385,21 @@ function FileManager(docID, basepath) {
         obj.docID = this.docID;
         obj.op = "fmMessage";
         if (this.remotes[remoteID] && this.remotes[remoteID].connection) {
-            console.log(`hilagit send:  ${remoteID} // ${docID} // ${obj.type} // ${JSON.stringify(obj).slice(0,10)}`);
             try {
-                this.remotes[remoteID].connection.write(JSON.stringify(obj) + "\n");
+                let resend = () => {
+                    console.log(`hilagit send:  ${remoteID} // ${docID} // ${obj.type} // ${JSON.stringify(obj).slice(0, 10)}`);
+                    this.remotes[remoteID].connection.write(JSON.stringify(obj) + "\n");
+                    if (!this.remotes[remoteID].firstMessageSentOK) {
+                        setTimeout(() => {
+                            if (!this.remotes[remoteID].firstMessageSentOK) {
+                                // something's gone wrong umm try and resend?
+                                resend();
+                            }
+                        }, 2000);
+                    }
+                }
+                resend();
+
             } catch (e) {
                 console.log(`${docID}: Remote ${remoteID} stream closed.`);
                 delete this.remotes[remoteID];
@@ -430,6 +442,7 @@ function FileManager(docID, basepath) {
 
     this.handleRemoteMessage = (data, remoteID) => {
         console.log(`hilagit recv:  ${remoteID} // ${docID} // ${data.type} // ${JSON.stringify(data.data).slice(0, 10)}`);
+        this.remotes[remoteID].firstMessageSentOK = true;
         switch (data.type) {
             case "requestCommitList":
                 //recieved when remote wants to pull our doc for the first time
