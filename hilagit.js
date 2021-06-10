@@ -448,7 +448,10 @@ function FileManager(docID, basepath) {
                 break;
             case "commitList":
                 //Check their commit list against our copy of their remote list
-                let ourCopyTheirs = Object.keys(this.commits).reduce((p, i) => ({ i: true, ...p }), {});
+                let ourCopyTheirs = Object.keys(this.commits).reduce((p, i) => {
+                    p[i] = true;
+                    return p;
+                }, {});
                 let theirs = data.data.reduce((p, i) => {
                     p[i] = true;
                     return p
