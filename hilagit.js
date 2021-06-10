@@ -117,6 +117,8 @@ let fileNameSafeEscape = {
     }
 }
 
+let nng; // storage for nanogram
+
 function FileManager(docID, basepath) {
     this.docID = docID;
     this.basepath = basepath;
@@ -393,7 +395,7 @@ function FileManager(docID, basepath) {
                             if (!this.remotes[remoteID].firstMessageSentOK) {
                                 // something's gone wrong, ask nanogram to close the connection
                                 this.remotes[remoteID].connection.end();
-                                nanogram.connectTo(remoteID);
+                                nng.connectTo(remoteID);
                             }
                         }, 2000);
                     }
@@ -608,7 +610,7 @@ module.exports = {
             }
         });
 
-        let nng = new nanogram(thisServerIdentifier, {
+        nng = new nanogram(thisServerIdentifier, {
             udpPort: 12482,
             callWord: "nanogram_gitlite"
         });
