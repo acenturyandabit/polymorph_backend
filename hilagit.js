@@ -510,6 +510,7 @@ function FileManager(docID, basepath) {
                 let inflatedHeadCommit = this.getInflatedCommit(headCommit);
                 let inflatedRemoteCommit = this.getInflatedCommit(remoteCommit);
                 // compare the commits
+                console.log(`headcommit had n keys: ${Object.keys(inflatedHeadCommit[i].items)}`);
                 let mutableCopyLatestCommit = {
                     source: thisServerIdentifier,
                     timestamp: Date.now(),
