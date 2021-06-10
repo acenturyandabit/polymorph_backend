@@ -474,6 +474,7 @@ function FileManager(docID, basepath) {
                         }
                     }
                     // save the commits to disk
+                    console.log(`enrolling commit from sendcommit: ${i.timestamp}, which is in commits? ${i.timestamp in this.commits}`);
                     this.enrolCommit(i);
                 });
                 // ask for the items we don't have
