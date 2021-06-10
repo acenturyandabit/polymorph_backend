@@ -522,7 +522,7 @@ function FileManager(docID, basepath) {
                         continue;
                     }
                     if (!inflatedHeadCommit.items[i] || inflatedHeadCommit.items[i] < inflatedRemoteCommit.items[i]) {
-                        console.log(`${docID} updating ${i} from ${remoteID} (lc:${inflatedHeadCommit.items[i]} vs rm:${inflatedRemoteCommit.items[i]})`);
+                        //console.log(`${docID} updating ${i} from ${remoteID} (lc:${inflatedHeadCommit.items[i]} vs rm:${inflatedRemoteCommit.items[i]})`);
                         mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
                     }
                 }
