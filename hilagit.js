@@ -537,7 +537,7 @@ function FileManager(docID, basepath) {
                     }
                     if (!inflatedHeadCommit.items[i] || inflatedHeadCommit.items[i] < inflatedRemoteCommit.items[i]) {
                         //console.log(`${docID} updating ${i} from ${remoteID} (lc:${inflatedHeadCommit.items[i]} vs rm:${inflatedRemoteCommit.items[i]})`);
-                        mutableCopyLatestCommit.items[i] = remoteCommit.items[i];
+                        mutableCopyLatestCommit.items[i] = inflatedRemoteCommit.items[i];
                     }
                 }
                 // compress the commit
