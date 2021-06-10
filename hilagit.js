@@ -510,7 +510,9 @@ function FileManager(docID, basepath) {
                 let inflatedHeadCommit = this.getInflatedCommit(headCommit);
                 let inflatedRemoteCommit = this.getInflatedCommit(remoteCommit);
                 // compare the commits
-                console.log(`headcommit had n keys: ${Object.keys(inflatedHeadCommit.items)}`);
+                console.log(`headcommit had n keys: ${Object.keys(inflatedHeadCommit.items).length}`);
+                console.log(`t of heacommit is: ${headCommit.timestamp}`);
+                console.log(`t of infla heacommit is: ${inflatedHeadCommit.timestamp}`);
                 let mutableCopyLatestCommit = {
                     source: thisServerIdentifier,
                     timestamp: Date.now(),
@@ -531,6 +533,8 @@ function FileManager(docID, basepath) {
 
                 // enrol the commit
                 this.enrolCommit(mutableCopyLatestCommit);
+                console.log(`mutable had n keys: ${Object.keys(mutableCopyLatestCommit.items).length}`);
+                console.log(`t of mutable is: ${mutableCopyLatestCommit.timestamp}`);
                 if (data.doneCallbackID) {
                     pullRequestCompletionCallbacks[data.doneCallbackID]();
                 }
