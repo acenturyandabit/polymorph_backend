@@ -143,7 +143,6 @@ function FileManager(docID, basepath) {
     };
     this.getLatestCommitFrom = (remoteID) => {
         let list = [];
-        console.log(`all commits:${Object.keys(this.commits)}`);
         for (let i in this.commits) {
             if (this.commits[i].source == remoteID) {
                 list.push(this.commits[i]);
@@ -172,7 +171,6 @@ function FileManager(docID, basepath) {
         // assuming commit is already compressed
         console.log(`enrolled commit ${commit.timestamp}`);
         this.commits[commit.timestamp] = commit;
-        console.log(`commit now: ${Object.keys(this.commits)}`);
         fs.writeFileSync(`${commitsPath}/${commit.timestamp}.json`, JSON.stringify(commit));
         return commit;
     }
