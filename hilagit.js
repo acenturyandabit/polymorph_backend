@@ -283,6 +283,8 @@ function FileManager(docID, basepath) {
         console.log(`compressing ${commit.timestamp} against ${commit.baseCommit} `)
             // delete items that are common to the headBaseCommit
         let cachedFullItems = JSON.parse(JSON.stringify(commit.items));
+        console.log(`cachedFullitems: ${Object.keys(cachedFullItems).length} initial keys: ${Object.keys(commit.items).length} `)
+
         if (!this.commits[commit.baseCommit]) {
             console.log(`ERR: baseCommit ${commit.baseCommit} for ${commit.timestamp} did not exist. skipping compression.`);
             commit.baseCommit = "";
@@ -305,7 +307,9 @@ function FileManager(docID, basepath) {
         console.log(`${Object.keys(commit.items).length} vs ${Object.keys(this.commits[commit.baseCommit].items).length}`);
         if (Object.keys(commit.items).length > Object.keys(this.commits[commit.baseCommit].items).length / 4) {
             console.log("override done");
+            console.log(`cachedFullitems: ${Object.keys(cachedFullItems).length} initial keys: ${Object.keys(commit.items).length} `)
             commit.items = cachedFullItems;
+            console.log(`cachedFullitems: ${Object.keys(cachedFullItems).length} initial keys: ${Object.keys(commit.items).length} `)
             commit.baseCommit = "";
         }
         return commit;
