@@ -453,6 +453,8 @@ function FileManager(docID, basepath) {
                     p[i] = true;
                     return p
                 }, {});
+                console.log(ourCopyTheirs);
+                console.log(theirs);
                 let toRequest = [];
                 for (let i in theirs) {
                     if (!ourCopyTheirs[i]) {
