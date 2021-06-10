@@ -217,9 +217,11 @@ module.exports = function nanogram(id, _options) {
                     });
                     delete conreqs[nanotag[1]];
                 } else {
+                    console.log(`Nanogram tag present (${data}) but no-one asked for the connection from ${nanotag[1]}`);
                     s.end();
                 }
             } else {
+                console.log(`Nanogram tag missing; data was actually ${data}`);
                 s.end();
             }
         });

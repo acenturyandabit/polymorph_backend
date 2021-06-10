@@ -269,7 +269,7 @@ function FileManager(docID, basepath) {
         Object.entries(inflatedCommit.items).forEach(i => {
             if (this.itemChunks[i[0]]) {
                 if (!this.itemChunks[i[0]][i[1]]) {
-                    console.log(`err: ${i[1]} in ${i[0]} does not exist, but ${i[0]} is ${JSON.stringify(this.itemChunks[i[0]]).slice(10)}`);
+                    console.log(`err: ${i[1]} in ${i[0]} does not exist, but ${i[0]} is ${JSON.stringify(Object.keys(this.itemChunks[i[0]]))}`);
                 } else {
                     doc[i[0]] = this.itemChunks[i[0]][i[1]];
                 }
@@ -493,6 +493,7 @@ function FileManager(docID, basepath) {
                     this.enrolCommit(i);
                 });
                 // ask for the items we don't have
+                console.log(`sending request for items, want ${itemsWeDontHave.length}`)
                 this.sendToRemote(remoteID, { type: "requestItems", data: itemsWeDontHave, doneCallbackID: data.doneCallbackID });
                 break;
             case "requestItems":
