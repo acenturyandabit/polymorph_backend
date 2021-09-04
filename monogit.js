@@ -112,13 +112,13 @@ function FileManager(docID, basepath) {
     };
     fileList.sort((a, b) => b - a);
     let latestFile = fileList[0];
-    if (fileList.length==0){
-        latestFile=0;
-        chunks[latestFile]={
-            baseFile:{},
-            log:[]
+    if (fileList.length == 0) {
+        latestFile = 0;
+        chunks[latestFile] = {
+            baseFile: {},
+            log: []
         };
-        fs.writeFileSync(`${commitsPath}/baseFile-${latestFile}.json`,"{}");
+        fs.writeFileSync(`${commitsPath}/baseFile-${latestFile}.json`, "{}");
     }
 
     let getVersion = (vID) => {
@@ -138,10 +138,19 @@ function FileManager(docID, basepath) {
     }
 
     let getLatestVersion = () => {
-        if (!chunks[latestFile]){
-            chunks[latestFile] = {
-                baseFile: JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${latestFile}.json`))),
-                log: (String(fs.readFileSync(`${commitsPath}/log-${latestFile}.json`)).split("\n")).filter(i=>i).map(i => JSON.parse(i))
+        if (!chunks[latestFile]) {
+            chunks[latestFile] = {};
+            try{
+                chunks[latestFile].baseFile= JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${latestFile}.json`)));
+            }catch(e){
+                // TODO: recompile basefile from previous commit
+                chunks[latestFile].baseFile={};
+            }
+            try{
+                chunks[latestFile].log = (String(fs.readFileSync(`${commitsPath}/log-${latestFile}.json`)).split("\n")).filter(i => i).map(i => JSON.parse(i))
+            }catch(e){
+                // TODO: recompile basefile from previous commit
+                chunks[latestFile].log=[];
             }
         }
         return getVersion(latestFile + chunks[latestFile].log.length);
@@ -166,35 +175,35 @@ function FileManager(docID, basepath) {
         //// Update local storage
         // filter out duplicate diffs. 
         let currentVersion = getLatestVersion();
-        for (let i in doc.items){
-            if (currentVersion[i] && currentVersion[i]._lu_>doc.items[i]._lu_){
+        for (let i in doc.items) {
+            if (currentVersion[i] && currentVersion[i]._lu_ > doc.items[i]._lu_) {
                 delete doc.items[i];
-            }else{
+            } else {
                 currentVersion[i] = doc.items[i];
             }
         }
         // append diff to latest file
         // if more than 1000 diffs, then restart
         chunks[latestFile].log.push(doc.items);
-        fs.appendFileSync(`${commitsPath}/log-${latestFile}.json`,JSON.stringify(doc.items)+"\n");
-        if (chunks[latestFile].log.length>999){
-            latestFile =Date.now();
+        fs.appendFileSync(`${commitsPath}/log-${latestFile}.json`, JSON.stringify(doc.items) + "\n");
+        if (chunks[latestFile].log.length > 999) {
+            latestFile = Date.now();
             chunks[latestFile].baseFile = currentVersion;
-            chunks[latestFile].log=[];
-            fs.writeFileSync(`${commitsPath}/baseFile-${latestFile}.json`,JSON.stringify(currentVersion));
+            chunks[latestFile].log = [];
+            fs.writeFileSync(`${commitsPath}/baseFile-${latestFile}.json`, JSON.stringify(currentVersion));
         }
 
         // Report new diffs
         let oldVersion = getVersion(doc.commit);
-        let changesToSend={};
-        for (let i in currentVersion){
-            if (!oldVersion[i] || currentVersion[i]._lu_>oldVersion[i]){
-                changesToSend[i]=currentVersion[i];
+        let changesToSend = {};
+        for (let i in currentVersion) {
+            if (!oldVersion[i] || currentVersion[i]._lu_ > oldVersion[i]) {
+                changesToSend[i] = currentVersion[i];
             }
         }
 
         return {
-            commit: latestFile*1000+chunks[latestFile].log.length,
+            commit: latestFile * 1000 + chunks[latestFile].log.length,
             items: changesToSend
         };
     }
@@ -202,7 +211,7 @@ function FileManager(docID, basepath) {
     this.collateForClient = () => {
         return {
             items: polymorph_core.datautils.IDCompress.compress(getLatestVersion()),
-            commit: latestFile*1000+chunks[latestFile].log.length
+            commit: latestFile * 1000 + chunks[latestFile].log.length
         };
     }
 }
@@ -236,7 +245,7 @@ module.exports = {
                 res();
             });
         }));
-        if (private.allowUserCreate){
+        if (private.allowUserCreate) {
             app.get("/monoglobby", async (req, res) => {
                 //get more from nanogram
                 res.send(JSON.stringify(Object.values(availList).map(i => i.id)));
@@ -245,7 +254,7 @@ module.exports = {
 
         app.post("/monogitsave", async (req, res) => {
             if (!availList[req.query.f]) {
-                if (!private.allowUserCreate){
+                if (!private.allowUserCreate && !fs.existsSync(private.baseMonoGitLocation + "/" + req.query.f)) {
                     res.status(400).end();
                     return;
                 }
