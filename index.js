@@ -43,3 +43,8 @@ if (private.baseGitLocation) {
     var glob = require("./hilagit");
     glob.prepare(app, private);
 }
+
+if (private.baseMonoGitLocation) {
+    var monogit = require("./monogit");
+    monogit.prepare(app, private);
+}
