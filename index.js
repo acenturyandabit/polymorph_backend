@@ -9,6 +9,7 @@ var private = require(process.argv[3] || './private');
 var port = process.argv[2] || 8080;
 
 app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.text({ limit: '50mb' }));
 app.use(express.static('polymorph'));
 app.listen(port);
 

@@ -263,7 +263,8 @@ module.exports = {
                     fileManager: new FileManager(req.query.f, private.baseMonoGitLocation + "/" + req.query.f) //lazy load
                 };
             }
-            let result = availList[req.query.f].fileManager.processClientIncoming(polymorph_core.datautils.decompress(req.body), thisServerIdentifier);
+            // we're not using json because cors
+            let result = availList[req.query.f].fileManager.processClientIncoming(JSON.parse(req.body), thisServerIdentifier);
             res.status(200).send(JSON.stringify(result));
         });
 
