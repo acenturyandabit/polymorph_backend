@@ -120,14 +120,19 @@ function FileManager(docID, basepath) {
         };
         fs.writeFileSync(`${commitsPath}/baseFile-${latestFile}.json`, "{}");
     }
-
+console.log(fileList);
     let getVersion = (vID) => {
         let file = (vID / 1000) | 0;// slice off last 3 to get the date
         let logRow = (vID % 1000);
         if (!chunks[file]) {
-            chunks[file] = {
-                baseFile: JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${file}.json`))),
-                log: (String(fs.readFileSync(`${commitsPath}/log-${file}.json`)).split("\n")).map(i => JSON.parse(i))
+            if (fs.existsSync(`${commitsPath}/baseFile-${file}.json`){
+                chunks[file] = {
+                    baseFile: JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${file}.json`))),
+                    log: (String(fs.readFileSync(`${commitsPath}/log-${file}.json`)).split("\n")).map(i => JSON.parse(i))
+                }
+            }else{
+                //Generate current commit from previous
+                //Write the file
             }
         }
         let result = Object.assign({}, chunks[file].baseFile);
