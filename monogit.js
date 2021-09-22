@@ -120,7 +120,7 @@ function FileManager(docID, basepath) {
         };
         fs.writeFileSync(`${commitsPath}/baseFile-${latestFile}.json`, "{}");
     }
-
+console.log(fileList);
     let getVersion = (vID) => {
         let file = (vID / 1000) | 0;// slice off last 3 to get the date
         let logRow = (vID % 1000);
