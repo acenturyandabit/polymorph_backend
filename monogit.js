@@ -141,6 +141,7 @@ console.log(fileList);
                 };
                 // write 
                 fs.writeFileSync(`${commitsPath}/baseFile-${file}.json`,JSON.stringify(baseFile));
+                fs.writeFileSync(`${commitsPath}/log-${file}.json`,""); // touch to exist
             }
         }
         let result = Object.assign({}, chunks[file].baseFile);
