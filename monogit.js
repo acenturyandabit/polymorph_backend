@@ -128,7 +128,7 @@ console.log(fileList);
             if (fs.existsSync(`${commitsPath}/baseFile-${file}.json`)){
                 chunks[file] = {
                     baseFile: JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${file}.json`))),
-                    log: (String(fs.readFileSync(`${commitsPath}/log-${file}.json`)).split("\n")).map(i => JSON.parse(i))
+                    log: (String(fs.readFileSync(`${commitsPath}/log-${file}.json`)).split("\n").filter(i=>i)).map(i => JSON.parse(i))
                 }
             }else{
                 let baseFile = Object.assign({},chunks[file-1].baseFile);
