@@ -125,9 +125,22 @@ function FileManager(docID, basepath) {
         let file = (vID / 1000) | 0;// slice off last 3 to get the date
         let logRow = (vID % 1000);
         if (!chunks[file]) {
-            chunks[file] = {
-                baseFile: JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${file}.json`))),
-                log: (String(fs.readFileSync(`${commitsPath}/log-${file}.json`)).split("\n")).map(i => JSON.parse(i))
+            if (fs.existsSync(`${commitsPath}/baseFile-${file}.json`)){
+                chunks[file] = {
+                    baseFile: JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${file}.json`))),
+                    log: (String(fs.readFileSync(`${commitsPath}/log-${file}.json`)).split("\n")).map(i => JSON.parse(i))
+                }
+            }else{
+                let baseFile = Object.assign({},chunks[file-1].baseFile);
+                chunks[file-1].log.forEach(i=>{
+                    Object.assign(baseFile, i);
+                })
+                chunks[file]={
+                    baseFile: baseFile,
+                    log: []
+                };
+                // write 
+                fs.writeFileSync(`${commitsPath}/baseFile-${file}.json`,JSON.stringify(baseFile));
             }
         }
         let result = Object.assign({}, chunks[file].baseFile);
@@ -197,7 +210,7 @@ function FileManager(docID, basepath) {
         let oldVersion = getVersion(doc.commit);
         let changesToSend = {};
         for (let i in currentVersion) {
-            if (!oldVersion[i] || currentVersion[i]._lu_ > oldVersion[i]) {
+            if (!oldVersion[i] || currentVersion[i]._lu_ > oldVersion[i]._lu_) {
                 changesToSend[i] = currentVersion[i];
             }
         }
