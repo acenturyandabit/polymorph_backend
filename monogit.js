@@ -120,28 +120,28 @@ function FileManager(docID, basepath) {
         };
         fs.writeFileSync(`${commitsPath}/baseFile-${latestFile}.json`, "{}");
     }
-console.log(fileList);
+    console.log(fileList);
     let getVersion = (vID) => {
-        let file = (vID / 1000) | 0;// slice off last 3 to get the date
+        let file = (vID / 1000) | 0; // slice off last 3 to get the date
         let logRow = (vID % 1000);
         if (!chunks[file]) {
-            if (fs.existsSync(`${commitsPath}/baseFile-${file}.json`)){
+            if (fs.existsSync(`${commitsPath}/baseFile-${file}.json`)) {
                 chunks[file] = {
                     baseFile: JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${file}.json`))),
-                    log: (String(fs.readFileSync(`${commitsPath}/log-${file}.json`)).split("\n").filter(i=>i)).map(i => JSON.parse(i))
+                    log: (String(fs.readFileSync(`${commitsPath}/log-${file}.json`)).split("\n").filter(i => i)).map(i => JSON.parse(i))
                 }
-            }else{
-                let baseFile = Object.assign({},chunks[file-1].baseFile);
-                chunks[file-1].log.forEach(i=>{
+            } else {
+                let baseFile = Object.assign({}, chunks[file - 1].baseFile);
+                chunks[file - 1].log.forEach(i => {
                     Object.assign(baseFile, i);
                 })
-                chunks[file]={
+                chunks[file] = {
                     baseFile: baseFile,
                     log: []
                 };
                 // write 
-                fs.writeFileSync(`${commitsPath}/baseFile-${file}.json`,JSON.stringify(baseFile));
-                fs.writeFileSync(`${commitsPath}/log-${file}.json`,""); // touch to exist
+                fs.writeFileSync(`${commitsPath}/baseFile-${file}.json`, JSON.stringify(baseFile));
+                fs.writeFileSync(`${commitsPath}/log-${file}.json`, ""); // touch to exist
             }
         }
         let result = Object.assign({}, chunks[file].baseFile);
@@ -154,17 +154,17 @@ console.log(fileList);
     let getLatestVersion = () => {
         if (!chunks[latestFile]) {
             chunks[latestFile] = {};
-            try{
-                chunks[latestFile].baseFile= JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${latestFile}.json`)));
-            }catch(e){
+            try {
+                chunks[latestFile].baseFile = JSON.parse(String(fs.readFileSync(`${commitsPath}/baseFile-${latestFile}.json`)));
+            } catch (e) {
                 // TODO: recompile basefile from previous commit
-                chunks[latestFile].baseFile={};
+                chunks[latestFile].baseFile = {};
             }
-            try{
+            try {
                 chunks[latestFile].log = (String(fs.readFileSync(`${commitsPath}/log-${latestFile}.json`)).split("\n")).filter(i => i).map(i => JSON.parse(i))
-            }catch(e){
+            } catch (e) {
                 // TODO: recompile basefile from previous commit
-                chunks[latestFile].log=[];
+                chunks[latestFile].log = [];
             }
         }
         return getVersion(latestFile + chunks[latestFile].log.length);
@@ -202,6 +202,8 @@ console.log(fileList);
         fs.appendFileSync(`${commitsPath}/log-${latestFile}.json`, JSON.stringify(doc.items) + "\n");
         if (chunks[latestFile].log.length > 999) {
             latestFile = Date.now();
+            // latestfile wont exist so create it
+            chunks[latestFile] = {};
             chunks[latestFile].baseFile = currentVersion;
             chunks[latestFile].log = [];
             fs.writeFileSync(`${commitsPath}/baseFile-${latestFile}.json`, JSON.stringify(currentVersion));
@@ -232,7 +234,7 @@ console.log(fileList);
 
 
 module.exports = {
-    prepare: async (app, private) => {
+    prepare: async(app, private) => {
         console.log("Loaded monogit");
         let availList = {};
         //do an FS sweep
@@ -242,8 +244,7 @@ module.exports = {
                 if (err) {
                     if (err.code == "ENOENT") {
                         fs.mkdirSync(private.baseMonoGitLocation, { recursive: true });
-                    }
-                    else {
+                    } else {
                         console.log(err);
                     }
                 } else {
@@ -260,13 +261,13 @@ module.exports = {
             });
         }));
         if (private.allowUserCreate) {
-            app.get("/monoglobby", async (req, res) => {
+            app.get("/monoglobby", async(req, res) => {
                 //get more from nanogram
                 res.send(JSON.stringify(Object.values(availList).map(i => i.id)));
             });
         }
 
-        app.post("/monogitsave", async (req, res) => {
+        app.post("/monogitsave", async(req, res) => {
             if (!availList[req.query.f]) {
                 if (!private.allowUserCreate && !fs.existsSync(private.baseMonoGitLocation + "/" + req.query.f)) {
                     res.status(400).end();
@@ -282,7 +283,7 @@ module.exports = {
             res.status(200).send(JSON.stringify(result));
         });
 
-        app.get("/monogitload", async (req, res) => {
+        app.get("/monogitload", async(req, res) => {
             if (!availList[req.query.f]) {
                 res.send(JSON.stringify({ commit: 0, doc: defaultBaseDocument(req.query.f) }));
                 return; // document does not exist, probably bc user added savesource but made no changes and didnt save
