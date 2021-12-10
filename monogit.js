@@ -167,7 +167,7 @@ function FileManager(docID, basepath) {
                 chunks[latestFile].log = [];
             }
         }
-        return getVersion(latestFile + chunks[latestFile].log.length);
+        return getVersion(latestFile * 1000 + chunks[latestFile].log.length);
     }
 
     /*
