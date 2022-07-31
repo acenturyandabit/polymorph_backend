@@ -103,11 +103,11 @@ function FileManager(docID, basepath, fileOptions) {
     // Create file structure if it does not exist
     if (!fs.existsSync(basepath)) {
         fs.mkdirSync(basepath);
-        // Create password if it does not exist
-        fs.writeFileSync(passwordPath, fileOptions.password);
     }
     if (!fs.existsSync(commitsPath)) {
         fs.mkdirSync(commitsPath);
+        // Create password if it does not exist
+        fs.writeFileSync(passwordPath, fileOptions.password);
     }
     if (fs.existsSync(passwordPath)) password = String(fs.readFileSync(passwordPath));
 
