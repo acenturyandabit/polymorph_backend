@@ -67,19 +67,24 @@ let fileNameSafeEscape = {
     }
 }
 
+let getLogTrueSize = (chunkLog) => {
+    let size = 0;
+    chunkLog.forEach(i => size += Object.keys(i).length);
+    return size;
+}
 
-function FileManager(docID, basepath) {
+function FileManager(docID, basepath, fileOptions) {
     this.docID = docID;
     this.basepath = basepath;
-
     let commitsPath = `${basepath}/commits`; // commits
+    let passwordPath = `${basepath}/password.txt`; // commits
     /*
     File structure
     /commits
         /baseFile-<unixtime>.json
         /log-<unixtime>.json
-
-    Live structure: 
+        /password.txt
+        Live structure: 
     chunks:{
         <unixtime>:{
             baseFile:{item:{value}}
@@ -87,31 +92,41 @@ function FileManager(docID, basepath) {
         }
         // lazy
     }
-
     */
+
+    // private vars
+    let password = "";
     let chunks = {};
+    let fileList = {};
+    if (!fileOptions) fileOptions = {};
+
+    // Create file structure if it does not exist
     if (!fs.existsSync(basepath)) {
         fs.mkdirSync(basepath);
+        // Create password if it does not exist
+        fs.writeFileSync(passwordPath, fileOptions.password);
     }
     if (!fs.existsSync(commitsPath)) {
         fs.mkdirSync(commitsPath);
     }
+    if (fs.existsSync(passwordPath)) password = String(fs.readFileSync(passwordPath));
+
 
     // Get latest latest file
-    let fileList = [];
-
     for (let commit of fs.readdirSync(commitsPath)) {
         if (commit.endsWith(".json")) {
             // split by dash and add it to the list of files
             try {
-                fileList.push(Number(commit.split("-")[1].split(".")[0]));
+                fileList[Number(commit.split("-")[1].split(".")[0])] = true;
             } catch (e) {
                 console.log("Invalid file " + commit);
             }
         }
     };
+    fileList = Object.keys(fileList);
     fileList.sort((a, b) => b - a);
     let latestFile = fileList[0];
+    // If there is no latest file, then write a new file
     if (fileList.length == 0) {
         latestFile = 0;
         chunks[latestFile] = {
@@ -120,9 +135,11 @@ function FileManager(docID, basepath) {
         };
         fs.writeFileSync(`${commitsPath}/baseFile-${latestFile}.json`, "{}");
     }
-    console.log(fileList);
+    console.log(`${docID} monoGitlite Files read:${fileList}`);
+
+
     let getVersion = (vID) => {
-        let file = (vID / 1000) | 0; // slice off last 3 to get the date
+        let file = Math.floor((vID / 1000)); // slice off last 3 to get the date
         let logRow = (vID % 1000);
         if (!chunks[file]) {
             if (fs.existsSync(`${commitsPath}/baseFile-${file}.json`)) {
@@ -131,8 +148,10 @@ function FileManager(docID, basepath) {
                     log: (String(fs.readFileSync(`${commitsPath}/log-${file}.json`)).split("\n").filter(i => i)).map(i => JSON.parse(i))
                 }
             } else {
-                let baseFile = Object.assign({}, chunks[file - 1].baseFile);
-                chunks[file - 1].log.forEach(i => {
+                console.log(`Failed on nonexistent file ${file}, vid was ${vID}`);
+                let lastFile = Object.keys(chunks).sort((a, b) => b - a)[0];
+                let baseFile = Object.assign({}, chunks[lastFile].baseFile);
+                chunks[lastFile].log.forEach(i => {
                     Object.assign(baseFile, i);
                 })
                 chunks[file] = {
@@ -182,9 +201,16 @@ function FileManager(docID, basepath) {
         /*
         doc:{
             commit: <vID>
-            items: {item:{}}
+            items: {item:{}},
+            password: <password>
         }
         */
+        if (password && doc.password != password) {
+            console.log("bad password attempt on " + docID + ": " + doc.password);
+            return {
+                err: "password mismatch"
+            }
+        }
 
         //// Update local storage
         // filter out duplicate diffs. 
@@ -200,7 +226,8 @@ function FileManager(docID, basepath) {
         // if more than 1000 diffs, then restart
         chunks[latestFile].log.push(doc.items);
         fs.appendFileSync(`${commitsPath}/log-${latestFile}.json`, JSON.stringify(doc.items) + "\n");
-        if (chunks[latestFile].log.length > 999) {
+        if (getLogTrueSize(chunks[latestFile].log) > 999) {
+            console.log("ok im splitting the version");
             latestFile = Date.now();
             // latestfile wont exist so create it
             chunks[latestFile] = {};
@@ -224,17 +251,23 @@ function FileManager(docID, basepath) {
         };
     }
 
-    this.collateForClient = () => {
-        return {
-            items: polymorph_core.datautils.IDCompress.compress(getLatestVersion()),
-            commit: latestFile * 1000 + chunks[latestFile].log.length
-        };
+    this.collateForClient = (options) => {
+        if (!(password && options.password != password)) {
+            return {
+                items: polymorph_core.datautils.IDCompress.compress(getLatestVersion()),
+                commit: latestFile * 1000 + chunks[latestFile].log.length
+            };
+        } else {
+            return {
+                err: "password mismatch"
+            }
+        }
     }
 }
 
 
 module.exports = {
-    prepare: async(app, private) => {
+    prepare: async (app, private) => {
         console.log("Loaded monogit");
         let availList = {};
         //do an FS sweep
@@ -261,13 +294,14 @@ module.exports = {
             });
         }));
         if (private.allowUserCreate) {
-            app.get("/monoglobby", async(req, res) => {
+            app.get("/monoglobby", async (req, res) => {
                 //get more from nanogram
                 res.send(JSON.stringify(Object.values(availList).map(i => i.id)));
             });
         }
 
-        app.post("/monogitsave", async(req, res) => {
+        app.post("/monogitsave", async (req, res) => {
+            console.log("Got save request at " + Date.now());
             if (!availList[req.query.f]) {
                 if (!private.allowUserCreate && !fs.existsSync(private.baseMonoGitLocation + "/" + req.query.f)) {
                     res.status(400).end();
@@ -275,7 +309,7 @@ module.exports = {
                 }
                 availList[req.query.f] = {
                     id: req.query.f,
-                    fileManager: new FileManager(req.query.f, private.baseMonoGitLocation + "/" + req.query.f) //lazy load
+                    fileManager: new FileManager(req.query.f, private.baseMonoGitLocation + "/" + req.query.f, JSON.parse(req.body)) //lazy load
                 };
             }
             // we're not using json because cors
@@ -283,7 +317,7 @@ module.exports = {
             res.status(200).send(JSON.stringify(result));
         });
 
-        app.get("/monogitload", async(req, res) => {
+        app.post("/monogitload", async (req, res) => {
             if (!availList[req.query.f]) {
                 res.send(JSON.stringify({ commit: 0, doc: defaultBaseDocument(req.query.f) }));
                 return; // document does not exist, probably bc user added savesource but made no changes and didnt save
@@ -291,7 +325,7 @@ module.exports = {
             if (!availList[req.query.f].fileManager) {
                 availList[req.query.f].fileManager = new FileManager(req.query.f, private.baseMonoGitLocation + "/" + req.query.f);
             }
-            res.send(JSON.stringify(availList[req.query.f].fileManager.collateForClient()));
+            res.send(JSON.stringify(availList[req.query.f].fileManager.collateForClient(JSON.parse(req.body))));
         });
     },
     FileManager: FileManager
