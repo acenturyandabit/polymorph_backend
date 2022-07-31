@@ -106,7 +106,9 @@ function FileManager(docID, basepath, fileOptions) {
     }
     if (!fs.existsSync(commitsPath)) {
         fs.mkdirSync(commitsPath);
+        console.log("no commits path, making it.");
         // Create password if it does not exist
+        console.log(fileOptions);
         fs.writeFileSync(passwordPath, fileOptions.password);
     }
     if (fs.existsSync(passwordPath)) password = String(fs.readFileSync(passwordPath));
@@ -270,6 +272,11 @@ module.exports = {
     prepare: async (app, private) => {
         console.log("Loaded monogit");
         let availList = {};
+
+        // Cache of initial files to make searching FS-independent after first load
+        // Added bonus of increased security for fs-exists
+        let initialFSList = {};
+
         //do an FS sweep
         await (new Promise((res, rej) => {
             //populate local lobby
@@ -283,47 +290,63 @@ module.exports = {
                 } else {
                     for (let f of files) {
                         if (f.isDirectory()) {
-                            availList[f.name] = {
-                                id: f.name,
-                                fileManager: new FileManager(f.name, private.baseMonoGitLocation + "/" + f.name) //lazy load
-                            };
+                            initialFSList[f.name] = true;
                         }
                     }
                 }
                 res();
             });
         }));
+
+
+
+        // respond to lobby requests
         if (private.allowUserCreate) {
             app.get("/monoglobby", async (req, res) => {
-                //get more from nanogram
                 res.send(JSON.stringify(Object.values(availList).map(i => i.id)));
             });
         }
 
+        // respond to save requests
         app.post("/monogitsave", async (req, res) => {
-            console.log("Got save request at " + Date.now());
+            console.log("Got save request at " + Date.now() + "for " + req.query.f);
+            // Check if there is a handler for it; if handler exists, implies directory exists.
             if (!availList[req.query.f]) {
-                if (!private.allowUserCreate && !fs.existsSync(private.baseMonoGitLocation + "/" + req.query.f)) {
+                // Check if directory has been allocated for it; if not, don't allow if users arent allowed to create docs
+                // Creating the directory will be handled downstream
+                if (!private.allowUserCreate && !initialFSList[req.query.f]) {
                     res.status(400).end();
                     return;
+                } else {
+                    availList[req.query.f] = {
+                        id: req.query.f,
+                        fileManager: new FileManager(req.query.f, private.baseMonoGitLocation + "/" + req.query.f, JSON.parse(req.body)) //lazy load
+                    };
                 }
-                availList[req.query.f] = {
-                    id: req.query.f,
-                    fileManager: new FileManager(req.query.f, private.baseMonoGitLocation + "/" + req.query.f, JSON.parse(req.body)) //lazy load
-                };
             }
+
+            // Recieve the updates
             // we're not using json because cors
             let result = availList[req.query.f].fileManager.processClientIncoming(JSON.parse(req.body), thisServerIdentifier);
             res.status(200).send(JSON.stringify(result));
         });
 
         app.post("/monogitload", async (req, res) => {
+            // Check if there is a handler for it; if handler exists, implies directory exists.
             if (!availList[req.query.f]) {
-                res.send(JSON.stringify({ commit: 0, doc: defaultBaseDocument(req.query.f) }));
-                return; // document does not exist, probably bc user added savesource but made no changes and didnt save
-            }
-            if (!availList[req.query.f].fileManager) {
-                availList[req.query.f].fileManager = new FileManager(req.query.f, private.baseMonoGitLocation + "/" + req.query.f);
+                // Check if directory has been allocated for it; if not, it doesn't exist.
+                if (initialFSList[req.query.f]) {
+                    availList[req.query.f] = {
+                        id: req.query.f,
+                        fileManager: new FileManager(req.query.f, private.baseMonoGitLocation + "/" + req.query.f)
+                    };
+                } else {
+                    // document does not exist, probably bc user added savesource but made no changes and didnt save
+                    // or it just isn't there
+                    // return the default document
+                    res.send(JSON.stringify({ commit: 0, doc: defaultBaseDocument(req.query.f) }));
+                    return;
+                }
             }
             res.send(JSON.stringify(availList[req.query.f].fileManager.collateForClient(JSON.parse(req.body))));
         });
