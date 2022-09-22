@@ -66,103 +66,109 @@ module.exports = function nanogram(id, _options) {
     if (options.transmitPeriod < 0) options.transmitPeriod = options.waitPeriod * 2 / 3;
 
     //add an event api
-    this.events = {};
-    this.fire = (e, args) => {
-        let _e = e.split(",");
-        _e.push("*"); // a wildcard event listener
-        _e.forEach((i) => {
-            if (!this.events[i]) return;
-            if (this.events[i].events) {
-                this.events[i].events.forEach((f) => {
-                    try {
-                        f(args)
-                    } catch (er) {
-                        console.log(er);
-                    }
-                });
-            }
-        })
-    };
-    this.on = (e, f) => {
-        let _e = e.split(',');
-        _e.forEach((i) => {
-            if (!this.events[i]) this.events[i] = {};
-            if (!this.events[i].events) this.events[i].events = [];
-            this.events[i].events.push(f);
-        })
-    };
+    (() => {
+        this.events = {};
+        this.fire = (e, args) => {
+            let _e = e.split(",");
+            _e.push("*"); // a wildcard event listener
+            _e.forEach((i) => {
+                if (!this.events[i]) return;
+                if (this.events[i].events) {
+                    this.events[i].events.forEach((f) => {
+                        try {
+                            f(args)
+                        } catch (er) {
+                            console.log(er);
+                        }
+                    });
+                }
+            })
+        };
+        this.on = (e, f) => {
+            let _e = e.split(',');
+            _e.forEach((i) => {
+                if (!this.events[i]) this.events[i] = {};
+                if (!this.events[i].events) this.events[i].events = [];
+                this.events[i].events.push(f);
+            })
+        };
+    })();
 
-    //create a udp port
+    let knownPeers = {};
+
+    ////UDP section 
+    // Create the server and overarching error handling
     const server = dgram.createSocket({ type: 'udp4', reuseAddr: true });
     server.bind(options.udpPort, undefined, () => {
         server.setBroadcast(true);
     })
-
     server.on('error', (err) => {
         console.log(`server error:\n${err.stack}`);
         server.close();
     });
 
-
-    let knownPeers = {};
     server.on('message', (msg, rinfo) => {
-        //if in correct format, add to the list
-        //console.log(`server got: ${msg} from ${rinfo.address}:${rinfo.port}`);
+        // Listen to UDP messages, and pick the ones that have the same id so we can connect to them
         msg = msg.toString();
+        let message;
         try {
-            let message = JSON.parse(msg);
-            if (message.callWord == options.callWord) {
-                //add it to the list of known clients
-                let newPeer = false;
-                if (message.id == id) return;
-                if (!knownPeers[message.id]) {
-                    newPeer = true;
-                    knownPeers[message.id] = {};
-                }
-                if (knownPeers[message.id].missingTimeout) clearInterval(knownPeers[message.id].missingTimeout);
-                Object.assign(knownPeers[message.id], {
-                    addr: rinfo.address,
-                    port: message.port,
-                    id: message.id,
-                    lastSeen: Date.now(),
-                    missingChances: 3,
-                    missingTimeout: setInterval(() => {
-                        knownPeers[message.id].missingChances--;
-                        if (knownPeers[message.id].missingChances == 0) {
-                            clearInterval(knownPeers[message.id].missingTimeout);
-                            this.fire("lostPeer", message.id);
-                            delete knownPeers[message.id];
-                        }
-                    }, options.waitPeriod + 500)
-                })
-                for (let i of message.conreqs) {
-                    if (i == id) {
-                        if (knownPeers[message.id].conreq) {
-                            if (knownPeers[message.id].conreq != true) {
-                                let socket = net.createConnection({ host: knownPeers[message.id].addr, port: knownPeers[message.id].port }, () => {
-                                    socket.write(`nanogram_${id}`, () => {
-                                        setTimeout(() => {
-                                            knownPeers[message.id].conreq({
-                                                connection: socket,
-                                                id: message.id,
-                                                state: "begin"
-                                            }); // otherwise first message is merged w nanogram id.
-                                        }, 100);
-                                    });
+            message = JSON.parse(msg);
+        } catch (err) {
+            console.log(`Nanogram picked up a message that was not proper json: ${msg} / ${err}`);
+            return;
+        }
+        if (message.callWord && message.callWord == options.callWord) {
+            //add it to the list of known clients
+            // ignore own messages
+            if (message.id == id) return;
+
+            // check if this is a new peer or a known peer
+            let newPeer = false;
+            if (!knownPeers[message.id]) {
+                newPeer = true;
+                knownPeers[message.id] = {};
+            }
+
+            if (knownPeers[message.id].missingTimeout) clearInterval(knownPeers[message.id].missingTimeout);
+            Object.assign(knownPeers[message.id], {
+                addr: rinfo.address,
+                port: message.port,
+                id: message.id,
+                lastSeen: Date.now(),
+                missingChances: 3,
+                missingTimeout: setInterval(() => {
+                    knownPeers[message.id].missingChances--;
+                    if (knownPeers[message.id].missingChances == 0) {
+                        clearInterval(knownPeers[message.id].missingTimeout);
+                        this.fire("lostPeer", message.id);
+                        delete knownPeers[message.id];
+                    }
+                }, options.waitPeriod + 500)
+            })
+            for (let i of message.conreqs) {
+                if (i == id) {
+                    if (knownPeers[message.id].conreq) {
+                        if (knownPeers[message.id].conreq != true) {
+                            let socket = net.createConnection({ host: knownPeers[message.id].addr, port: knownPeers[message.id].port }, () => {
+                                socket.write(`nanogram_${id}`, () => {
+                                    setTimeout(() => {
+                                        knownPeers[message.id].conreq({
+                                            connection: socket,
+                                            id: message.id,
+                                            state: "begin"
+                                        }); // otherwise first message is merged w nanogram id.
+                                    }, 100);
                                 });
-                            }
-                        } else {
-                            knownPeers[message.id].conreq = true;
+                            });
                         }
+                    } else {
+                        knownPeers[message.id].conreq = true;
                     }
                 }
-                if (newPeer) {
-                    this.fire("newPeer", message.id);
-                }
             }
-        } catch (e) {
-            console.log(e);
-            return;
+            if (newPeer) {
+                this.fire("newPeer", message.id);
+            }
         }
     });
 

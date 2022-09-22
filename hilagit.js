@@ -278,6 +278,7 @@ function FileManager(docID, basepath) {
                 console.log(`err: ${i[0]} not found from a commit`);
             }
         });
+        console.log("commit to items done");
         return doc;
     }
 
@@ -379,8 +380,9 @@ function FileManager(docID, basepath) {
         return this.commitToItems(mergedCommit);
     }
 
-    this.collateForClient = () => {
+    this.collateForClient = (commitID) => {
         let headCommit = this.getLatestCommitFrom(thisServerIdentifier);
+        if (commitID) headCommit = this.commits[commitID];
         console.log(headCommit.timestamp);
         return this.commitToItems(headCommit);
     }
@@ -608,6 +610,7 @@ module.exports = {
                     availList[req.query.f].fileManager = new FileManager(req.query.f, private.baseGitLocation + "/" + req.query.f);
                 }
                 res.send(JSON.stringify(availList[req.query.f].fileManager.collateForClient()));
+                console.log("sent over");
             } else {
                 //pull from server -- which one? any one, they should be synced
                 if (!availList[req.query.f].fileManager) {
@@ -727,5 +730,6 @@ module.exports = {
                 })
             })
         }
-    }
+    },
+    FileManager: FileManager
 }
